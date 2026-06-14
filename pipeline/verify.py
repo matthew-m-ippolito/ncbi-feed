@@ -4,6 +4,7 @@ Used to vet NEW imports in the daily pipeline (and as a post-sweep QA pass): a s
 fact-checker flags any claim/number/year/location in a summary not supported by the
 abstract; flagged summaries are rewritten and (optionally) re-checked.
 """
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import headlines  # reuse _call_claude, _extract_json, _trim
 
@@ -40,16 +41,25 @@ def _run(batches, fn, workers):
 
 def check(pairs, cfg, log=print):
     """pairs: [{id, summary, abstract}] -> {id: {ok, problems}}"""
-    bs, workers = 6, cfg.get("workers", 6)
+    bs, workers = 5, cfg.get("workers", 6)
     batches = [pairs[i:i + bs] for i in range(0, len(pairs), bs)]
 
     def do(batch):
+        ids = [it["id"] for it in batch]
         p = CHECK_PROMPT
         for it in batch:
             p += "id=%s\nSUMMARY: %s\nABSTRACT: %s\n\n" % (
-                it["id"], it["summary"], (it.get("abstract") or "")[:6000])
-        arr = headlines._extract_json(headlines._call_claude(p, cfg["model"], cfg.get("timeout", 240))) or []
-        return {str(x["id"]): x for x in arr if isinstance(x, dict) and x.get("id")}
+                it["id"], it["summary"], (it.get("abstract") or "")[:5000])
+        got = {}
+        for _ in range(3):  # retry until every id in the batch comes back
+            arr = headlines._extract_json(headlines._call_claude(p, cfg["model"], cfg.get("timeout", 300))) or []
+            for x in arr:
+                if isinstance(x, dict) and x.get("id"):
+                    got[str(x["id"])] = x
+            if all(i in got for i in ids):
+                break
+            time.sleep(2)
+        return got
 
     return _run(batches, do, workers)
 
@@ -60,14 +70,22 @@ def correct(items, cfg, log=print):
     batches = [items[i:i + bs] for i in range(0, len(items), bs)]
 
     def do(batch):
+        ids = [it["id"] for it in batch]
         p = CORRECT_PROMPT
         for it in batch:
             p += "id=%s\nPROBLEMS: %s\nCURRENT SUMMARY: %s\nABSTRACT: %s\n\n" % (
                 it["id"], "; ".join(it.get("problems") or []), it["summary"],
-                (it.get("abstract") or "")[:6000])
-        arr = headlines._extract_json(headlines._call_claude(p, cfg["model"], cfg.get("timeout", 240))) or []
-        return {str(x["id"]): headlines._trim(x.get("details", ""))
-                for x in arr if isinstance(x, dict) and x.get("id") and x.get("details")}
+                (it.get("abstract") or "")[:5000])
+        got = {}
+        for _ in range(3):
+            arr = headlines._extract_json(headlines._call_claude(p, cfg["model"], cfg.get("timeout", 300))) or []
+            for x in arr:
+                if isinstance(x, dict) and x.get("id") and x.get("details"):
+                    got[str(x["id"])] = headlines._trim(x["details"])
+            if all(i in got for i in ids):
+                break
+            time.sleep(2)
+        return got
 
     return _run(batches, do, workers)
 
