@@ -10,9 +10,9 @@
   };
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
-  var PROJECTS = ['CHASM', 'Computer Vision', 'Forecasting', 'Genomics', 'ICEMR',
-    'IMPRINT', 'MACEPA', 'MARSHAL', 'PDMC', 'PharCide', 'Pharmacokinetics', 'PLATFORM',
-    'Serology', 'VSA'];
+  var PROJECTS = ['CHASM', 'Computer Vision', 'Drug Resistance', 'Forecasting', 'Genomics',
+    'ICEMR', 'IMPRINT', 'MACEPA', 'MARSHAL', 'New Drugs', 'Other', 'PDMC', 'PharCide',
+    'Pharmacokinetics', 'PLATFORM', 'Review', 'Serology', 'VSA'];
 
   // ---------- defensive storage ----------
   function load(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
@@ -45,6 +45,7 @@
   var tpl = document.getElementById('card-tpl');
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
   var starModal = document.getElementById('star-modal');
+  var exportBtn = document.getElementById('export-btn');
 
   // ---------- helpers ----------
   function stEntry(pmid) { return state[pmid] || (state[pmid] = {}); }
@@ -60,11 +61,7 @@
   }
   function fmtDate(s) {
     var d = parseDate(s); if (!d) return '';
-    var now = new Date();
-    var mon = d.toLocaleString('en-US', { month: 'short' });
-    return d.getFullYear() === now.getFullYear()
-      ? mon + ' ' + d.getDate()
-      : mon + ' ' + d.getFullYear();
+    return d.toLocaleString('en-US', { month: 'short' }) + ' ' + d.getDate() + ', ' + d.getFullYear();
   }
   function relTime(s) {
     var d = parseDate(s); if (!d) return '';
@@ -104,8 +101,7 @@
   // ---------- projects (auto-tags + manual filing) ----------
   function effProjects(a) {
     var s = state[a.id];
-    if (s && s.projects) return s.projects;          // manual override
-    return a.projects || [];                         // auto-tags
+    return (s && s.projects) ? s.projects : [];      // manual tags only (no auto-labeling)
   }
   function matchesProject(a) {
     if (!prefs.project) return true;
@@ -232,6 +228,44 @@
     rendered = 0;
     renderMore();
     showEmptyState();
+    if (exportBtn) exportBtn.textContent = 'Export ' + visible.length;
+  }
+
+  function csvCell(v) {
+    return '"' + (v == null ? '' : String(v)).replace(/"/g, '""') + '"';
+  }
+  function exportCSV() {
+    var cols = ['labels', 'author', 'year', 'title', 'journal', 'summary', 'stars', 'link'];
+    var rows = [cols.join(',')];
+    for (var i = 0; i < visible.length; i++) {
+      var a = visible[i];
+      var d = parseDate(a.date);
+      rows.push([
+        effProjects(a).join('; '),
+        a.authors || '',
+        d ? d.getFullYear() : '',
+        a.title_original || '',
+        a.journal || '',
+        a.details || '',
+        getStars(a.id) || '',
+        a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/')
+      ].map(csvCell).join(','));
+    }
+    var fname = 'malaria-feed-' + prefs.view + '-' + visible.length + '.csv';
+    var blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    try {                                   // iOS: native share sheet (Save to Files, email, AirDrop)
+      var file = new File([blob], fname, { type: 'text/csv' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({ files: [file], title: 'Malaria Feed export' }).catch(function () {});
+        return;
+      }
+    } catch (e) {}
+    var url = URL.createObjectURL(blob);    // desktop fallback: direct download
+    var aEl = document.createElement('a');
+    aEl.href = url; aEl.download = fname;
+    document.body.appendChild(aEl);
+    aEl.click();
+    setTimeout(function () { document.body.removeChild(aEl); URL.revokeObjectURL(url); }, 200);
   }
   function showEmptyState() {
     var none = visible.length === 0;
@@ -491,6 +525,7 @@
     save(LS.prefs, prefs);
     applyView();
   });
+  if (exportBtn) exportBtn.addEventListener('click', exportCSV);
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       prefs.view = tab.dataset.view;

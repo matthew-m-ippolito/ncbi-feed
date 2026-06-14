@@ -35,7 +35,7 @@ def log(*a):
 
 def headlines_cfg(cfg):
     h = dict(cfg["headlines"])
-    h["projects"] = cfg.get("projects", [])
+    h["projects"] = []  # auto-tagging disabled; projects are assigned manually in the app
     return h
 
 
