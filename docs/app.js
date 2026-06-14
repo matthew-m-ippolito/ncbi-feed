@@ -11,8 +11,8 @@
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
   var PROJECTS = ['CHASM', 'CV', 'Drug Resistance', 'Drugs', 'Forecasting',
-    'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MARSHAL', 'PDMC', 'PharCide', 'PK/PD',
-    'PLATFORM', 'Review', 'Serology', 'VSA', 'Other'];
+    'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MARSHAL', 'Modeling', 'PDMC', 'PharCide',
+    'PK/PD', 'PLATFORM', 'Review', 'Serology', 'VSA', 'Other'];
 
   // ---------- defensive storage ----------
   function load(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
