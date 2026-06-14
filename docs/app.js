@@ -10,7 +10,7 @@
   };
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
-  var PROJECTS = ['CHASM', 'Computer Vision', 'Drug Resistance', 'Drugs', 'Forecasting',
+  var PROJECTS = ['CHASM', 'CV', 'Drug Resistance', 'Drugs', 'Forecasting',
     'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MARSHAL', 'PDMC', 'PharCide', 'PK/PD',
     'PLATFORM', 'Review', 'Serology', 'VSA', 'Other'];
 
