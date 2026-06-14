@@ -346,8 +346,8 @@
     var startX = 0, startY = 0, dx = 0, active = false, decided = false, horiz = false;
     node.addEventListener('pointerdown', function (e) {
       if (e.button != null && e.button !== 0) return;
-      if (e.target.closest('.peek') || e.target.closest('.card-actions') ||
-          e.target.closest('.proj-chips') || e.target.closest('a')) return;
+      if (e.target.closest('.card-actions') || e.target.closest('.proj-chips') ||
+          e.target.closest('.proj-editor') || e.target.closest('a')) return;
       startX = e.clientX; startY = e.clientY; dx = 0; active = true; decided = false; horiz = false;
       node.style.transition = 'none';
     });
