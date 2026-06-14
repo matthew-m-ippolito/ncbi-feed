@@ -10,9 +10,9 @@
   },
   "headlines": {
     "method": "claude-cli",
-    "model": "claude-haiku-4-5",
-    "batch_size": 12,
-    "workers": 8,
+    "model": "claude-opus-4-8",
+    "batch_size": 5,
+    "workers": 6,
     "headline_words": 12,
     "max_words": 90,
     "abstract_chars": 3500

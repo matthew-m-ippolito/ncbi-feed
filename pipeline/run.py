@@ -27,6 +27,7 @@ sys.path.insert(0, HERE)
 import pubmed
 import headlines
 import store
+import verify
 
 
 def log(*a):
@@ -130,6 +131,9 @@ def main():
     items = [{"id": pid, "title": meta[pid]["title"], "abstract": abmap.get(pid, "")}
              for pid in usable]
     hmap = headlines.generate(items, headlines_cfg(cfg), log=log)
+    log("adversarially checking %d new summaries ..." % len(items))
+    hmap, vstats = verify.verify_and_correct(items, hmap, headlines_cfg(cfg), log=log)
+    log("  adversarial result: %s" % vstats)
 
     today = date.today().isoformat()
     for pid in usable:
