@@ -17,6 +17,21 @@
     "max_words": 90,
     "abstract_chars": 3500
   },
+  "projects": [
+    {"label": "CHASM", "desc": "Severe malaria pathophysiology in children: cerebral malaria, severe malarial respiratory distress, thrombocytopenia; biomarkers, proteomics, clinical phenotyping (echocardiography, fundoscopy, ultrasound), mechanistic endotyping."},
+    {"label": "Computer Vision", "desc": "Machine-learning image analysis for malaria: automated microscopy or blood-smear parasite detection, deep learning on images, smartphone or automated image-based diagnosis."},
+    {"label": "Forecasting", "desc": "Predictive modeling of malaria burden or transmission using machine-learning/statistics on climate, environmental, or surveillance data; AI tools for surveillance and targeted control."},
+    {"label": "Genomics", "desc": "Plasmodium parasite genomics: whole-genome sequencing, genetic diversity and population structure, drug-resistance markers (kelch13, pfmdr1, etc.), molecular/genomic epidemiology."},
+    {"label": "ICEMR", "desc": "Longitudinal malaria epidemiology and surveillance (especially Zambia): parasite prevalence, entomology, reactive case detection, household risk factors, transmission, vaccine implementation."},
+    {"label": "IMPRINT", "desc": "Malaria and the gut microbiome: metagenomics/metabolomics, how microbiome composition affects antimalarial drug absorption or efficacy and malaria pathogenesis."},
+    {"label": "MACEPA", "desc": "Pharmacokinetic/pharmacodynamic studies of antimalarials (especially piperaquine), dried-blood-spot sampling and PKPD modeling, partnership with national malaria control programs."},
+    {"label": "MARSHAL", "desc": "Retrospective hospital-records (case-control) studies of malaria presentations and outcomes (mortality, comorbidities, nutrition) in low-resource settings."},
+    {"label": "PharCide", "desc": "Randomized trials comparing antimalarials (e.g. artemether-lumefantrine vs dihydroartemisinin-piperaquine) in children with uncomplicated falciparum malaria; parasite clearance, recrudescence, treatment failure."},
+    {"label": "Pharmacokinetics", "desc": "Antimalarial drug pharmacokinetics/pharmacodynamics: drug concentrations, absorption/metabolism, PK modeling, exposure-response relationships."},
+    {"label": "PLATFORM", "desc": "Trial of whole-blood transfusion for severe malaria with thrombocytopenia in children; mortality outcomes and platelet-activation biomarkers."},
+    {"label": "Serology", "desc": "Malaria seroepidemiology: seroprevalence and antibody dynamics to Plasmodium antigens (MSP-1, AMA-1), age/seasonal patterns, force of infection, transmission intensity."},
+    {"label": "VSAS", "desc": "Variant surface antigens: PfEMP1 diversity and var genes, VSA expression and immune responses, especially in severe/cerebral malaria; systematic reviews of VSA."}
+  ],
   "daily_reldate_days": 3,
   "feed_cap": 0,
   "paths": {

@@ -1,10 +1,11 @@
-"""Plain-language headline + detailed-summary generation via the local `claude` CLI.
+"""Plain-language headline + detailed summary + project tagging via the local `claude` CLI.
 
-For each article, one model call produces BOTH:
-  - headline: short, scannable, <= headline_words words
+For each article, one model call produces:
+  - headline: short, scannable (<= headline_words words)
   - details : a 2-4 sentence summary carrying the study's specifics and main results
-Results are cached by PMID (so each paper is processed once); a model error falls
-back to a cleaned title. Batches run concurrently.
+  - projects: which of the researcher's projects the article is relevant to (0+)
+Results are cached by PMID; a model error falls back to a cleaned title. Batches run
+concurrently.
 """
 import json
 import os
@@ -23,24 +24,20 @@ PROMPT_HEAD = (
     '(2) "details": a detailed plain-English summary of 2-4 sentences (up to about %d words) '
     "giving the study design and population/sample size, the exact intervention, exposure, or "
     "question (specific drugs and doses, parasite species such as P. falciparum or P. vivax, "
-    "and precise clinical entities such as cerebral malaria vs severe malarial anemia, or "
+    "precise clinical entities such as cerebral malaria vs severe malarial anemia, or "
     "artemisinin partial resistance with Kelch13 mutations), and MOST IMPORTANTLY the main "
     "quantitative results (cure rates, prevalence %%, odds/hazard ratios, effect sizes, "
     "p-values) and the authors' conclusion; "
-    '(3) "notable": a boolean -- true ONLY if this is a likely paradigm-shifting, '
-    "practice-changing, or landmark advance (e.g. first demonstration of a major effect, a "
-    "novel mechanism or drug target with broad implications, a large definitive or phase-3 "
-    "trial likely to change guidelines, a major drug-resistance or transmission breakthrough, "
-    "a new vaccine efficacy result). Be CONSERVATIVE: the large majority of papers are "
-    "routine, incremental, descriptive, single-site, or review/protocol papers and must be "
-    'false; and (4) "notable_reason": if notable is true, at most 10 words on why; else "". '
+    '(3) "projects": an array of the EXACT labels, taken from the PROJECTS list below, of any '
+    "of the researcher's projects this article is genuinely relevant to. Tag a project only if "
+    "the article clearly fits its specific scope; most articles match NONE or ONE project; "
+    "return [] if none clearly apply. "
     "For headline and details: include ONLY facts and numbers stated in the abstract; NEVER "
     "invent or estimate numbers, drugs, locations, or findings; if a detail is not in the "
-    "abstract, omit it. Prefer exact entities over vague words. No hype, no clickbait. If no "
-    "abstract is provided, base headline/details on the title, set notable false, and do not "
-    "fabricate results. Output ONLY a JSON array, no prose and no code fence: "
-    '[{"id":"<id>","headline":"<short>","details":"<detailed>","notable":false,"notable_reason":""}]'
-    "\n\nArticles:\n"
+    "abstract, omit it. Prefer exact entities over vague words. No hype. If no abstract is "
+    "provided, base headline/details on the title and do not fabricate results. "
+    "Output ONLY a JSON array, no prose and no code fence: "
+    '[{"id":"<id>","headline":"<short>","details":"<detailed>","projects":["<label>"]}]'
 )
 
 
@@ -77,16 +74,26 @@ def _save_cache(c):
     os.replace(tmp, CACHE_FILE)
 
 
+def _allowed(cfg):
+    return {p["label"].lower(): p["label"] for p in cfg.get("projects", [])}
+
+
 def _build_prompt(batch, cfg):
-    lines = [PROMPT_HEAD % (cfg.get("headline_words", 12), cfg.get("max_words", 90))]
+    parts = [PROMPT_HEAD % (cfg.get("headline_words", 12), cfg.get("max_words", 90))]
+    projects = cfg.get("projects", [])
+    if projects:
+        parts.append("\n\nPROJECTS (tag with EXACT labels that genuinely apply; most match none or one):")
+        for p in projects:
+            parts.append("- %s: %s" % (p["label"], p.get("desc", "")))
+    parts.append("\nArticles:")
     ac = cfg.get("abstract_chars", 3500)
     for it in batch:
         line = "id=%s | title=%s" % (it["id"], it["title"])
         ab = (it.get("abstract") or "").strip()
         if ab:
             line += " | abstract=" + ab[:ac].replace("\n", " ")
-        lines.append(line)
-    return "\n".join(lines)
+        parts.append(line)
+    return "\n".join(parts)
 
 
 def _extract_json(out):
@@ -109,7 +116,18 @@ def _call_claude(prompt, model, timeout):
     return p.stdout
 
 
+def _norm_projects(raw, allowed):
+    out = []
+    if isinstance(raw, list):
+        for x in raw:
+            lab = allowed.get(str(x).strip().lower())
+            if lab and lab not in out:
+                out.append(lab)
+    return out
+
+
 def _process_batch(batch, cfg):
+    allowed = _allowed(cfg)
     prompt = _build_prompt(batch, cfg)
     res = {}
     for _ in range(2):  # one retry if incomplete/malformed
@@ -124,8 +142,7 @@ def _process_batch(batch, cfg):
                     res[str(o["id"])] = {
                         "headline": _trim(o["headline"]).rstrip("."),
                         "details": _trim(o.get("details", "")),
-                        "notable": bool(o.get("notable")),
-                        "notable_reason": _trim(o.get("notable_reason", "")),
+                        "projects": _norm_projects(o.get("projects"), allowed),
                     }
             if all(it["id"] in res for it in batch):
                 break
@@ -133,7 +150,7 @@ def _process_batch(batch, cfg):
 
 
 def generate(items, cfg, log=print):
-    """items: [{id, title, abstract}] -> {id: {headline, details}}. Caches results."""
+    """items: [{id, title, abstract}] -> {id: {headline, details, projects}}. Caches results."""
     cache = _load_cache()
     out = {}
     todo = []
@@ -167,8 +184,7 @@ def generate(items, cfg, log=print):
                     cache[it["id"]] = res[it["id"]]
                 else:
                     out[it["id"]] = {"headline": clean_title(it["title"]),
-                                     "details": clean_title(it["title"]),
-                                     "notable": False, "notable_reason": ""}
+                                     "details": clean_title(it["title"]), "projects": []}
             done += 1
             if done % 5 == 0 or done == len(batches):
                 log("    %d/%d batches" % (done, len(batches)))

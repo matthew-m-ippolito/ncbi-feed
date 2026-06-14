@@ -33,6 +33,12 @@ def log(*a):
     print(*a, flush=True)
 
 
+def headlines_cfg(cfg):
+    h = dict(cfg["headlines"])
+    h["projects"] = cfg.get("projects", [])
+    return h
+
+
 def load_config():
     with open(os.path.join(ROOT, "config.json")) as f:
         return json.load(f)
@@ -123,7 +129,7 @@ def main():
 
     items = [{"id": pid, "title": meta[pid]["title"], "abstract": abmap.get(pid, "")}
              for pid in usable]
-    hmap = headlines.generate(items, cfg["headlines"], log=log)
+    hmap = headlines.generate(items, headlines_cfg(cfg), log=log)
 
     today = date.today().isoformat()
     for pid in usable:
@@ -142,8 +148,7 @@ def main():
             "url": m.get("url") or ("https://pubmed.ncbi.nlm.nih.gov/%s/" % pid),
             "has_abstract": pid in abmap,
             "has_details": bool(hd.get("details")),
-            "notable": bool(hd.get("notable")),
-            "notable_reason": hd.get("notable_reason", ""),
+            "projects": hd.get("projects", []),
         }
 
     abstracts_store = store.load_abstracts(abs_path)
@@ -171,7 +176,7 @@ def regen_headlines(cfg, art_path, abs_path):
     items = [{"id": pid, "title": a.get("title_original", ""), "abstract": abmap.get(pid, "")}
              for pid, a in existing.items()]
     log("regenerating %d headlines ..." % len(items))
-    hmap = headlines.generate(items, cfg["headlines"], log=log)
+    hmap = headlines.generate(items, headlines_cfg(cfg), log=log)
     changed = 0
     for pid, a in existing.items():
         hd = hmap.get(pid)
@@ -179,8 +184,9 @@ def regen_headlines(cfg, art_path, abs_path):
             a["headline"] = hd["headline"]
             a["details"] = hd.get("details", "")
             a["has_details"] = bool(hd.get("details"))
-            a["notable"] = bool(hd.get("notable"))
-            a["notable_reason"] = hd.get("notable_reason", "")
+            a["projects"] = hd.get("projects", [])
+            a.pop("notable", None)
+            a.pop("notable_reason", None)
             changed += 1
     gen = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     n = store.save_articles(art_path, existing, gen, cap=cfg.get("feed_cap", 0))

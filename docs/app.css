@@ -15,7 +15,7 @@
   --notable-accent: #f59f00;
   --border: #e2e7e8;
   --shadow: 0 1px 2px rgba(20, 40, 45, .06), 0 1px 8px rgba(20, 40, 45, .04);
-  --header-h: 104px;
+  --header-h: 144px;
   --tabbar-h: 56px;
   --maxw: 720px;
 }
@@ -87,6 +87,33 @@ body {
   background: var(--surface);
   color: var(--accent);
 }
+
+/* project filter bar */
+.project-bar {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  max-width: var(--maxw);
+  margin: 8px auto 0;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.project-bar::-webkit-scrollbar { display: none; }
+.project-bar:empty { display: none; }
+.pbar-chip {
+  flex: 0 0 auto;
+  font-size: .76rem; font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  white-space: nowrap;
+}
+.pbar-chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.pbar-n { margin-left: 6px; font-weight: 700; opacity: .7; }
+.pbar-chip.active .pbar-n { opacity: .9; }
 
 /* ---------- "N new" pill ---------- */
 .new-pill {
@@ -171,22 +198,30 @@ body {
   font-size: .72rem;
 }
 
-/* notable / game-changing science */
-.card.is-notable { border-left: 3px solid var(--notable-accent); }
-.notable-badge {
-  display: inline-flex;
-  align-items: flex-start;
-  gap: 5px;
-  margin: 9px 0 0;
-  padding: 4px 10px;
-  background: var(--notable-bg);
-  color: var(--notable-fg);
-  border: 1px solid var(--notable-border);
-  border-radius: 9px;
-  font-size: .76rem;
-  font-weight: 650;
-  line-height: 1.35;
+/* project tags on a card */
+.proj-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.proj-chip {
+  font-size: .72rem; font-weight: 650;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--accent-weak);
+  background: var(--accent-weak);
+  color: var(--accent);
 }
+.proj-chip:active { transform: scale(.96); }
+.proj-edit-chip { background: transparent; border: 1px dashed var(--border); color: var(--faint); font-weight: 600; }
+
+/* manual "file under projects" editor */
+.proj-editor-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.proj-opt {
+  font-size: .74rem; font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+.proj-opt.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* ---------- Actions ---------- */
 .card-actions { display: flex; gap: 6px; margin-top: 11px; }

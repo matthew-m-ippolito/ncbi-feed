@@ -31,6 +31,7 @@
            autocorrect="off" autocapitalize="none" enterkeyhint="search">
     <button id="sort-btn" class="sort-btn" type="button" title="Sort by date">Newest</button>
   </div>
+  <div id="project-bar" class="project-bar" aria-label="Filter by project"></div>
 </header>
 
 <button id="new-pill" class="new-pill" type="button" hidden></button>
@@ -62,11 +63,10 @@
     <a class="card-main" href="#" target="_blank" rel="noopener">
       <h2 class="headline"></h2>
     </a>
-    <div class="notable-badge" hidden><span aria-hidden="true">🔥</span> <span class="notable-text"></span></div>
     <div class="meta-row">
       <span class="meta"><span class="journal"></span><span class="meta-dot"> · </span><span class="date"></span></span>
-      <span class="chip source"></span>
     </div>
+    <div class="proj-chips"></div>
     <div class="card-actions">
       <button class="act details-btn" type="button" aria-expanded="false">Details</button>
       <button class="act title-btn" type="button" aria-expanded="false">Title</button>
@@ -87,6 +87,10 @@
       <p class="peek-label">Abstract</p>
       <p class="abstract-text"></p>
       <a class="fulltext-link" target="_blank" rel="noopener">Open full text on PubMed&nbsp;↗</a>
+    </div>
+    <div class="proj-editor peek" hidden>
+      <p class="peek-label">File under projects</p>
+      <div class="proj-editor-chips"></div>
     </div>
   </article>
 </template>

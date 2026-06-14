@@ -9,6 +9,10 @@
     meta:  'ncbifeed.v1.meta'   // { seenIds:[...] }
   };
   var PAGE = 30;
+  // your research projects, alphabetical (used for the manual tag editor)
+  var PROJECTS = ['CHASM', 'Computer Vision', 'Forecasting', 'Genomics', 'ICEMR',
+    'IMPRINT', 'MACEPA', 'MARSHAL', 'PharCide', 'Pharmacokinetics', 'PLATFORM',
+    'Serology', 'VSAS'];
 
   // ---------- defensive storage ----------
   function load(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
@@ -95,6 +99,95 @@
     return false;
   }
 
+  // ---------- projects (auto-tags + manual filing) ----------
+  function effProjects(a) {
+    var s = state[a.id];
+    if (s && s.projects) return s.projects;          // manual override
+    return a.projects || [];                         // auto-tags
+  }
+  function matchesProject(a) {
+    if (!prefs.project) return true;
+    return effProjects(a).indexOf(prefs.project) >= 0;
+  }
+  function setProjectFilter(p) {
+    prefs.project = (p && prefs.project === p) ? '' : p;
+    save(LS.prefs, prefs);
+    renderProjectBar();
+    window.scrollTo(0, 0);
+    applyView();
+  }
+  function toggleProject(a, label, node) {
+    var cur = effProjects(a).slice();
+    var i = cur.indexOf(label);
+    if (i >= 0) cur.splice(i, 1); else cur.push(label);
+    stEntry(a.id).projects = cur;
+    persistState();
+    renderProjChips(node, a);
+    renderProjEditor(node, a);
+    renderProjectBar();
+    if (prefs.project && !matchesProject(a)) removeCard(node);
+  }
+  function renderProjectBar() {
+    var bar = document.getElementById('project-bar');
+    if (!bar) return;
+    var counts = {};
+    for (var i = 0; i < allArticles.length; i++) {
+      var ps = effProjects(allArticles[i]);
+      for (var j = 0; j < ps.length; j++) counts[ps[j]] = (counts[ps[j]] || 0) + 1;
+    }
+    bar.innerHTML = '';
+    bar.appendChild(mkFilterChip('All', '', !prefs.project));
+    Object.keys(counts).sort().forEach(function (p) {
+      var b = mkFilterChip(p, p, prefs.project === p);
+      var n = document.createElement('span');
+      n.className = 'pbar-n'; n.textContent = counts[p];
+      b.appendChild(n);
+      bar.appendChild(b);
+    });
+  }
+  function mkFilterChip(text, project, active) {
+    var b = document.createElement('button');
+    b.className = 'pbar-chip' + (active ? ' active' : '');
+    b.type = 'button';
+    b.appendChild(document.createTextNode(text));
+    b.addEventListener('click', function () { setProjectFilter(project); });
+    return b;
+  }
+  function renderProjChips(node, a) {
+    var box = node.querySelector('.proj-chips');
+    box.innerHTML = '';
+    var ps = effProjects(a);
+    ps.forEach(function (p) {
+      var c = document.createElement('button');
+      c.className = 'proj-chip'; c.type = 'button'; c.textContent = p;
+      c.addEventListener('click', function () { setProjectFilter(p); });
+      box.appendChild(c);
+    });
+    var edit = document.createElement('button');
+    edit.className = 'proj-chip proj-edit-chip'; edit.type = 'button';
+    edit.textContent = ps.length ? '＋' : '＋ Tag';
+    edit.setAttribute('aria-label', 'Edit project tags');
+    edit.addEventListener('click', function () {
+      var peek = node.querySelector('.proj-editor');
+      var open = !peek.hidden;
+      peek.hidden = open;
+      if (!open) renderProjEditor(node, a);
+    });
+    box.appendChild(edit);
+  }
+  function renderProjEditor(node, a) {
+    var box = node.querySelector('.proj-editor-chips');
+    box.innerHTML = '';
+    var cur = effProjects(a);
+    PROJECTS.forEach(function (p) {
+      var c = document.createElement('button');
+      c.className = 'proj-opt' + (cur.indexOf(p) >= 0 ? ' active' : '');
+      c.type = 'button'; c.textContent = p;
+      c.addEventListener('click', function () { toggleProject(a, p, node); });
+      box.appendChild(c);
+    });
+  }
+
   // ---------- counts ----------
   function updateCounts() {
     var unread = 0, starred = 0;
@@ -123,7 +216,7 @@
     return (a._hay || '').indexOf(searchTerm) !== -1;
   }
   function applyView() {
-    visible = allArticles.filter(function (a) { return matchesView(a) && matchesSearch(a); });
+    visible = allArticles.filter(function (a) { return matchesView(a) && matchesProject(a) && matchesSearch(a); });
     visible.sort(function (x, y) {
       var dx = x._t, dy = y._t;
       return prefs.sort === 'oldest' ? dx - dy : dy - dx;
@@ -138,6 +231,7 @@
     emptyEl.hidden = !none;
     if (none) {
       if (searchTerm) emptyEl.textContent = 'No headlines match “' + searchEl.value + '”.';
+      else if (prefs.project) emptyEl.textContent = 'No “' + prefs.project + '” articles in ' + prefs.view + '.';
       else if (prefs.view === 'unread') emptyEl.textContent = 'You’re all caught up. 🎉';
       else if (prefs.view === 'starred') emptyEl.textContent = 'Nothing starred yet. Tap ☆ on an article to keep it here.';
       else emptyEl.textContent = 'No articles yet. New papers will appear here.';
@@ -170,19 +264,12 @@
     if (isHighJournal(a.journal)) jEl.classList.add('high-impact');
     var dt = node.querySelector('.date'); dt.textContent = fmtDate(a.date);
     if (!a.journal || !dt.textContent) node.querySelector('.meta-dot').style.display = 'none';
-    var chip = node.querySelector('.source');
-    if (a.source) chip.textContent = a.source; else chip.style.display = 'none';
+    renderProjChips(node, a);
 
     var abBtn = node.querySelector('.abstract-btn');
     if (!a.has_abstract) abBtn.style.display = 'none';
 
     if (newIds[a.id]) node.classList.add('is-new');
-    if (a.notable) {
-      node.classList.add('is-notable');
-      var nb = node.querySelector('.notable-badge');
-      nb.hidden = false;
-      nb.querySelector('.notable-text').textContent = a.notable_reason || 'Notable finding';
-    }
     paintState(node, a);
 
     // open PubMed + mark read
@@ -289,6 +376,7 @@
     updatedEl.textContent = data.generated_at ? relTime(data.generated_at) : '';
     computeNew();
     updateCounts();
+    renderProjectBar();
     applyView();
     loadingEl.hidden = true;
     errorEl.hidden = true;
