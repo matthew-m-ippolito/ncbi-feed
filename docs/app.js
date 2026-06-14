@@ -218,12 +218,12 @@
   function applyView() {
     visible = allArticles.filter(function (a) { return matchesView(a) && matchesProject(a) && matchesSearch(a); });
     visible.sort(function (x, y) {
+      if (prefs.sort === 'shuffle') return (x._shuf || 0) - (y._shuf || 0);
       if (prefs.view === 'important') {
         var sx = getStars(x.id), sy = getStars(y.id);
         if (sx !== sy) return sy - sx;             // highest-rated first
       }
-      var dx = x._t, dy = y._t;
-      return prefs.sort === 'oldest' ? dx - dy : dy - dx;
+      return prefs.sort === 'oldest' ? (x._t - y._t) : (y._t - x._t);
     });
     feedEl.innerHTML = '';
     rendered = 0;
@@ -478,6 +478,7 @@
     a._t = d ? d.getTime() : 0;
     a._hay = ((a.headline || '') + ' ' + (a.details || '') + ' ' + (a.title_original || '') + ' ' +
               (a.journal || '') + ' ' + (a.authors || '')).toLowerCase();
+    a._shuf = Math.random();
     allById[a.id] = a;
     return a;
   }
@@ -530,9 +531,15 @@
       applyView();
     }, 140);
   });
+  var SORT_NEXT = { newest: 'oldest', oldest: 'shuffle', shuffle: 'newest' };
+  function sortGlyph(s) { return s === 'oldest' ? '↓' : s === 'shuffle' ? '🔀' : '↑'; }
+  function sortTip(s) { return s === 'oldest' ? 'Oldest first' : s === 'shuffle' ? 'Shuffle' : 'Newest first'; }
+  function reshuffle() { for (var i = 0; i < allArticles.length; i++) allArticles[i]._shuf = Math.random(); }
+  function paintSortBtn() { sortBtn.textContent = sortGlyph(prefs.sort); sortBtn.title = sortTip(prefs.sort); }
   sortBtn.addEventListener('click', function () {
-    prefs.sort = prefs.sort === 'newest' ? 'oldest' : 'newest';
-    sortBtn.textContent = prefs.sort === 'newest' ? 'Newest' : 'Oldest';
+    prefs.sort = SORT_NEXT[prefs.sort] || 'newest';
+    if (prefs.sort === 'shuffle') reshuffle();
+    paintSortBtn();
     save(LS.prefs, prefs);
     applyView();
   });
@@ -582,7 +589,7 @@
 
 
   // restore UI prefs
-  sortBtn.textContent = prefs.sort === 'oldest' ? 'Oldest' : 'Newest';
+  paintSortBtn();
   tabs.forEach(function (t) { t.setAttribute('aria-selected', t.dataset.view === prefs.view ? 'true' : 'false'); });
 
   // ---------- boot ----------

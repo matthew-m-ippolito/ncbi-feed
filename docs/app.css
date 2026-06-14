@@ -98,12 +98,14 @@ body {
 .search:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 .sort-btn {
   flex: 0 0 auto;
-  font-size: .8rem; font-weight: 600;
-  padding: 0 12px;
+  min-width: 46px;
+  font-size: 1.05rem; font-weight: 600;
+  padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 11px;
   background: var(--surface);
   color: var(--accent);
+  text-align: center;
 }
 
 /* project filter bar */
