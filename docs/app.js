@@ -44,6 +44,7 @@
   var newPill = document.getElementById('new-pill');
   var tpl = document.getElementById('card-tpl');
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  var starModal = document.getElementById('star-modal');
 
   // ---------- helpers ----------
   function stEntry(pmid) { return state[pmid] || (state[pmid] = {}); }
@@ -306,8 +307,7 @@
     node.addEventListener('pointerdown', function (e) {
       if (e.button != null && e.button !== 0) return;
       if (e.target.closest('.peek') || e.target.closest('.card-actions') ||
-          e.target.closest('.proj-chips') || e.target.closest('.star-picker') ||
-          e.target.closest('a')) return;
+          e.target.closest('.proj-chips') || e.target.closest('a')) return;
       startX = e.clientX; startY = e.clientY; dx = 0; active = true; decided = false; horiz = false;
       node.style.transition = 'none';
     });
@@ -332,7 +332,7 @@
       node.classList.remove('swiping', 'swipe-arch', 'swipe-imp');
       if (decided && horiz && Math.abs(dx) > SWIPE_COMMIT) {
         if (dx < 0) applyTriage(node, a, 'archive');
-        else openStarPicker(node, a);
+        else openStarModal(node, a);
       } else {
         node.style.transition = 'transform .2s ease';
         node.style.transform = '';
@@ -341,26 +341,19 @@
     node.addEventListener('pointerup', end);
     node.addEventListener('pointercancel', end);
   }
-  function openStarPicker(node, a) {
+  var pendingStar = null;
+  function openStarModal(node, a) {
     node.style.transition = 'transform .2s ease';
-    node.style.transform = '';
-    var picker = node.querySelector('.star-picker');
-    var box = picker.querySelector('.sp-stars');
-    box.innerHTML = '';
-    var cur = getStars(a.id);
-    for (var s = 1; s <= 5; s++) {
-      (function (val) {
-        var b = document.createElement('button');
-        b.className = 'sp-star' + (val <= cur ? ' on' : '');
-        b.type = 'button';
-        b.textContent = val <= cur ? '★' : '☆';
-        b.addEventListener('click', function () { picker.hidden = true; applyTriage(node, a, 'important', val); });
-        box.appendChild(b);
-      })(s);
-    }
-    picker.querySelector('.sp-cancel').onclick = function () { picker.hidden = true; };
-    picker.hidden = false;
+    node.style.transform = '';                 // snap card back; the modal does the prompting
+    pendingStar = { node: node, a: a };
+    fillStars(getStars(a.id));
+    starModal.hidden = false;
   }
+  function fillStars(n) {
+    var sts = starModal.querySelectorAll('.sm-star');
+    for (var i = 0; i < sts.length; i++) sts[i].classList.toggle('on', i < n);
+  }
+  function closeStarModal() { starModal.hidden = true; pendingStar = null; }
 
   // ---------- triage: archive / important (+stars) ----------
   function archive(a) {
@@ -512,6 +505,27 @@
     newPill.hidden = true;
     window.scrollTo(0, 0);
   });
+
+  // star-rating modal (shown on swipe-right)
+  if (starModal) {
+    var smStars = document.getElementById('sm-stars');
+    for (var v = 1; v <= 5; v++) {
+      (function (val) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'sm-star'; b.textContent = '★';
+        b.setAttribute('aria-label', val + (val > 1 ? ' stars' : ' star'));
+        b.addEventListener('mouseenter', function () { fillStars(val); });
+        b.addEventListener('pointerdown', function () { fillStars(val); });
+        b.addEventListener('click', function () {
+          if (pendingStar) applyTriage(pendingStar.node, pendingStar.a, 'important', val);
+          closeStarModal();
+        });
+        smStars.appendChild(b);
+      })(v);
+    }
+    document.getElementById('sm-cancel').addEventListener('click', closeStarModal);
+    starModal.addEventListener('click', function (e) { if (e.target === starModal) closeStarModal(); });
+  }
   document.getElementById('retry').addEventListener('click', function () { errorEl.hidden = true; loadingEl.hidden = false; boot(); });
 
   if (sentinelEl && 'IntersectionObserver' in window) {

@@ -33,9 +33,13 @@ PROMPT_HEAD = (
     "the article clearly fits its specific scope; most articles match NONE or ONE project; "
     "return [] if none clearly apply. "
     "For headline and details: include ONLY facts and numbers stated in the abstract; NEVER "
-    "invent or estimate numbers, drugs, locations, or findings; if a detail is not in the "
-    "abstract, omit it. Prefer exact entities over vague words. No hype. If no abstract is "
-    "provided, base headline/details on the title and do not fabricate results. "
+    "invent or estimate numbers, drugs, findings, or conclusions. In particular, do NOT state a "
+    "country, region, city, study site, calendar year, date range or study period, total sample "
+    "size, or instrument/device model UNLESS it appears verbatim in the abstract; never infer "
+    "location from author names, affiliations, or context. Read fractions and ratios exactly "
+    "(e.g. '5/30' means 5 of 30, not 30). If a detail is not in the abstract, omit it rather than "
+    "guessing. Prefer exact entities over vague words. No hype. If no abstract is provided, base "
+    "headline/details on the title ONLY and do not fabricate results. "
     "Output ONLY a JSON array, no prose and no code fence: "
     '[{"id":"<id>","headline":"<short>","details":"<detailed>","projects":["<label>"]}]'
 )

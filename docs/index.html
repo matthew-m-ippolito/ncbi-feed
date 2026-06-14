@@ -58,6 +58,14 @@
   </button>
 </nav>
 
+<div id="star-modal" class="star-modal" hidden>
+  <div class="sm-sheet" role="dialog" aria-label="Rate importance" aria-modal="true">
+    <p class="sm-title">Mark important</p>
+    <div class="sm-stars" id="sm-stars"></div>
+    <button id="sm-cancel" class="sm-cancel" type="button">Cancel</button>
+  </div>
+</div>
+
 <template id="card-tpl">
   <article class="card" data-pmid="">
     <div class="card-stars" hidden></div>
@@ -94,11 +102,6 @@
     <div class="proj-editor peek" hidden>
       <p class="peek-label">File under projects</p>
       <div class="proj-editor-chips"></div>
-    </div>
-    <div class="star-picker" hidden>
-      <span class="sp-label">Important — rate:</span>
-      <span class="sp-stars"></span>
-      <button class="sp-cancel" type="button" aria-label="Cancel">✕</button>
     </div>
   </article>
 </template>
