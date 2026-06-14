@@ -47,37 +47,40 @@
 <div id="sentinel" aria-hidden="true"></div>
 
 <nav class="tabbar" role="tablist">
-  <button class="tab" role="tab" data-view="all" aria-selected="true">
-    <span class="tab-label">All</span><span class="tab-count" data-count="all"></span>
+  <button class="tab" role="tab" data-view="inbox" aria-selected="true">
+    <span class="tab-label">Inbox</span><span class="tab-count" data-count="inbox"></span>
   </button>
-  <button class="tab" role="tab" data-view="unread" aria-selected="false">
-    <span class="tab-label">Unread</span><span class="tab-count" data-count="unread"></span>
+  <button class="tab" role="tab" data-view="important" aria-selected="false">
+    <span class="tab-label">Important</span><span class="tab-count" data-count="important"></span>
   </button>
-  <button class="tab" role="tab" data-view="starred" aria-selected="false">
-    <span class="tab-label">Starred</span><span class="tab-count" data-count="starred"></span>
+  <button class="tab" role="tab" data-view="archive" aria-selected="false">
+    <span class="tab-label">Archive</span><span class="tab-count" data-count="archive"></span>
   </button>
 </nav>
 
 <template id="card-tpl">
   <article class="card" data-pmid="">
-    <a class="card-main" href="#" target="_blank" rel="noopener">
+    <div class="card-stars" hidden></div>
+    <div class="card-main">
       <h2 class="headline"></h2>
-    </a>
+    </div>
     <div class="meta-row">
       <span class="meta"><span class="journal"></span><span class="meta-dot"> · </span><span class="date"></span></span>
     </div>
     <div class="proj-chips"></div>
     <div class="card-actions">
-      <button class="act details-btn" type="button" aria-expanded="false">Details</button>
+      <button class="act authors-btn" type="button" aria-expanded="false">Authors</button>
       <button class="act title-btn" type="button" aria-expanded="false">Title</button>
       <button class="act abstract-btn" type="button" aria-expanded="false">Abstract</button>
-      <button class="act act-icon star-btn" type="button" aria-pressed="false" aria-label="Star for later">
-        <span class="star-ico" aria-hidden="true">☆</span>
-      </button>
     </div>
     <div class="details-peek peek" hidden>
       <p class="peek-label">Summary</p>
       <p class="details-text"></p>
+      <a class="fulltext-link" target="_blank" rel="noopener">Open full text on PubMed&nbsp;↗</a>
+    </div>
+    <div class="authors-peek peek" hidden>
+      <p class="peek-label">Authors</p>
+      <p class="authors-text"></p>
     </div>
     <div class="title-peek peek" hidden>
       <p class="peek-label">Original title</p>
@@ -91,6 +94,11 @@
     <div class="proj-editor peek" hidden>
       <p class="peek-label">File under projects</p>
       <div class="proj-editor-chips"></div>
+    </div>
+    <div class="star-picker" hidden>
+      <span class="sp-label">Important — rate:</span>
+      <span class="sp-stars"></span>
+      <button class="sp-cancel" type="button" aria-label="Cancel">✕</button>
     </div>
   </article>
 </template>

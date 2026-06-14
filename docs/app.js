@@ -11,16 +11,17 @@
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
   var PROJECTS = ['CHASM', 'Computer Vision', 'Forecasting', 'Genomics', 'ICEMR',
-    'IMPRINT', 'MACEPA', 'MARSHAL', 'PharCide', 'Pharmacokinetics', 'PLATFORM',
-    'Serology', 'VSAS'];
+    'IMPRINT', 'MACEPA', 'MARSHAL', 'PDMC', 'PharCide', 'Pharmacokinetics', 'PLATFORM',
+    'Serology', 'VSA'];
 
   // ---------- defensive storage ----------
   function load(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
   function save(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch (e) {} }
 
   var state = load(LS.state, {});
-  var prefs = load(LS.prefs, { view: 'all', sort: 'newest' });
+  var prefs = load(LS.prefs, { view: 'inbox', sort: 'newest' });
   var meta  = load(LS.meta, { seenIds: [] });
+  if (['inbox', 'important', 'archive'].indexOf(prefs.view) < 0) prefs.view = 'inbox';
 
   var allArticles = [];
   var allById = {};
@@ -30,7 +31,6 @@
   var abstracts = null, abstractsPromise = null;
   var newIds = {};
   var freshData = null;
-  var readObserver = null;
 
   // ---------- DOM ----------
   var feedEl = document.getElementById('feed');
@@ -47,8 +47,9 @@
 
   // ---------- helpers ----------
   function stEntry(pmid) { return state[pmid] || (state[pmid] = {}); }
-  function isRead(p) { return !!(state[p] && state[p].read); }
-  function isStarred(p) { return !!(state[p] && state[p].starred); }
+  function isArchived(p) { return !!(state[p] && state[p].archived); }
+  function isImportant(p) { return !!(state[p] && state[p].important); }
+  function getStars(p) { return (state[p] && state[p].stars) || 0; }
   function persistState() { save(LS.state, state); }
 
   function parseDate(s) {
@@ -190,26 +191,27 @@
 
   // ---------- counts ----------
   function updateCounts() {
-    var unread = 0, starred = 0;
+    var inbox = 0, important = 0, archive = 0;
     for (var i = 0; i < allArticles.length; i++) {
       var p = allArticles[i].id;
-      if (!isRead(p)) unread++;
-      if (isStarred(p)) starred++;
+      if (isArchived(p)) archive++;
+      else if (isImportant(p)) important++;
+      else inbox++;
     }
-    setCount('all', allArticles.length);
-    setCount('unread', unread);
-    setCount('starred', starred);
+    setCount('inbox', inbox);
+    setCount('important', important);
+    setCount('archive', archive);
   }
   function setCount(view, n) {
     var el = document.querySelector('.tab-count[data-count="' + view + '"]');
-    if (el) el.textContent = n > 0 ? String(n) : (view === 'all' ? String(n) : '');
+    if (el) el.textContent = n > 0 ? String(n) : '';
   }
 
   // ---------- filtering ----------
   function matchesView(a) {
-    if (prefs.view === 'unread') return !isRead(a.id);
-    if (prefs.view === 'starred') return isStarred(a.id);
-    return true;
+    if (prefs.view === 'important') return isImportant(a.id);
+    if (prefs.view === 'archive') return isArchived(a.id);
+    return !isArchived(a.id) && !isImportant(a.id); // inbox = untriaged
   }
   function matchesSearch(a) {
     if (!searchTerm) return true;
@@ -218,6 +220,10 @@
   function applyView() {
     visible = allArticles.filter(function (a) { return matchesView(a) && matchesProject(a) && matchesSearch(a); });
     visible.sort(function (x, y) {
+      if (prefs.view === 'important') {
+        var sx = getStars(x.id), sy = getStars(y.id);
+        if (sx !== sy) return sy - sx;             // highest-rated first
+      }
       var dx = x._t, dy = y._t;
       return prefs.sort === 'oldest' ? dx - dy : dy - dx;
     });
@@ -232,9 +238,9 @@
     if (none) {
       if (searchTerm) emptyEl.textContent = 'No headlines match “' + searchEl.value + '”.';
       else if (prefs.project) emptyEl.textContent = 'No “' + prefs.project + '” articles in ' + prefs.view + '.';
-      else if (prefs.view === 'unread') emptyEl.textContent = 'You’re all caught up. 🎉';
-      else if (prefs.view === 'starred') emptyEl.textContent = 'Nothing starred yet. Tap ☆ on an article to keep it here.';
-      else emptyEl.textContent = 'No articles yet. New papers will appear here.';
+      else if (prefs.view === 'inbox') emptyEl.textContent = 'Inbox zero. 🎉 Nothing left to triage.';
+      else if (prefs.view === 'important') emptyEl.textContent = 'Nothing important yet. Swipe a card right to file it here.';
+      else emptyEl.textContent = 'Archive is empty. Swipe a card left to archive it.';
     }
   }
 
@@ -251,14 +257,15 @@
     var node = tpl.content.firstElementChild.cloneNode(true);
     node.dataset.pmid = a.id;
     var main = node.querySelector('.card-main');
-    main.href = a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/');
     node.querySelector('.headline').textContent = a.headline || a.title_original || '(untitled)';
     node.querySelector('.orig-title').textContent = a.title_original || '';
     node.querySelector('.details-text').textContent = a.details || '';
+    node.querySelector('.authors-text').textContent = a.authors || 'Authors not listed';
+    var url = a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/');
+    var links = node.querySelectorAll('.fulltext-link');
+    for (var k = 0; k < links.length; k++) links[k].href = url;
     var titleBtn = node.querySelector('.title-btn');
-    var detailsBtn = node.querySelector('.details-btn');
     if (!a.title_original) titleBtn.style.display = 'none';
-    if (!a.details) detailsBtn.style.display = 'none';
     var jEl = node.querySelector('.journal');
     jEl.textContent = a.journal || '';
     if (isHighJournal(a.journal)) jEl.classList.add('high-impact');
@@ -272,46 +279,112 @@
     if (newIds[a.id]) node.classList.add('is-new');
     paintState(node, a);
 
-    // open PubMed + mark read
-    main.addEventListener('click', function () { setRead(a.id, true, node, a); });
-    detailsBtn.addEventListener('click', function () { togglePeek(node, '.details-peek', detailsBtn); });
-    titleBtn.addEventListener('click', function () { togglePeek(node, '.title-peek', titleBtn); });
+    main.addEventListener('click', function () { togglePeek(node, '.details-peek', null); });
+    node.querySelector('.authors-btn').addEventListener('click', function (e) { togglePeek(node, '.authors-peek', e.currentTarget); });
+    titleBtn.addEventListener('click', function (e) { togglePeek(node, '.title-peek', e.currentTarget); });
     abBtn.addEventListener('click', function () { toggleAbstract(node, a); });
-    node.querySelector('.star-btn').addEventListener('click', function () { toggleStar(a.id, node, a); });
-    if (readObserver && !isRead(a.id)) readObserver.observe(node);
+    addSwipe(node, a);
     return node;
   }
 
   function paintState(node, a) {
-    var read = isRead(a.id), starred = isStarred(a.id);
-    node.classList.toggle('is-read', read);
-    var sb = node.querySelector('.star-btn');
-    sb.setAttribute('aria-pressed', starred ? 'true' : 'false');
-    sb.querySelector('.star-ico').textContent = starred ? '★' : '☆';
-  }
-
-  // ---------- state mutations ----------
-  function setRead(pmid, val, node, a, opts) {
-    var e = stEntry(pmid);
-    if (val) { e.read = 1; e.readAt = Date.now(); } else { delete e.read; delete e.readAt; }
-    persistState();
-    updateCounts();
-    if (node && a) {
-      if (!(opts && opts.noRemove) && !matchesView(a)) removeCard(node);
-      else paintState(node, a);
+    node.classList.toggle('is-archived', isArchived(a.id));
+    node.classList.toggle('is-important', isImportant(a.id));
+    var sEl = node.querySelector('.card-stars');
+    if (isImportant(a.id)) {
+      var n = getStars(a.id);
+      sEl.textContent = '★★★★★'.slice(0, n) + '☆☆☆☆☆'.slice(0, 5 - n);
+      sEl.hidden = false;
+    } else {
+      sEl.hidden = true;
     }
   }
-  function toggleStar(pmid, node, a) {
-    var e = stEntry(pmid);
-    if (e.starred) delete e.starred; else e.starred = 1;
-    persistState();
-    afterChange(node, a);
+
+  var SWIPE_COMMIT = 85;
+  function addSwipe(node, a) {
+    var startX = 0, startY = 0, dx = 0, active = false, decided = false, horiz = false;
+    node.addEventListener('pointerdown', function (e) {
+      if (e.button != null && e.button !== 0) return;
+      if (e.target.closest('.peek') || e.target.closest('.card-actions') ||
+          e.target.closest('.proj-chips') || e.target.closest('.star-picker') ||
+          e.target.closest('a')) return;
+      startX = e.clientX; startY = e.clientY; dx = 0; active = true; decided = false; horiz = false;
+      node.style.transition = 'none';
+    });
+    node.addEventListener('pointermove', function (e) {
+      if (!active) return;
+      dx = e.clientX - startX;
+      var dy = e.clientY - startY;
+      if (!decided && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+        decided = true; horiz = Math.abs(dx) > Math.abs(dy);
+        if (horiz) { try { node.setPointerCapture(e.pointerId); } catch (_) {} }
+      }
+      if (decided && horiz) {
+        e.preventDefault();
+        node.style.transform = 'translateX(' + dx + 'px)';
+        node.classList.toggle('swipe-arch', dx <= -SWIPE_COMMIT);
+        node.classList.toggle('swipe-imp', dx >= SWIPE_COMMIT);
+        node.classList.add('swiping');
+      }
+    });
+    function end() {
+      if (!active) return; active = false;
+      node.classList.remove('swiping', 'swipe-arch', 'swipe-imp');
+      if (decided && horiz && Math.abs(dx) > SWIPE_COMMIT) {
+        if (dx < 0) applyTriage(node, a, 'archive');
+        else openStarPicker(node, a);
+      } else {
+        node.style.transition = 'transform .2s ease';
+        node.style.transform = '';
+      }
+    }
+    node.addEventListener('pointerup', end);
+    node.addEventListener('pointercancel', end);
   }
-  function afterChange(node, a) {
+  function openStarPicker(node, a) {
+    node.style.transition = 'transform .2s ease';
+    node.style.transform = '';
+    var picker = node.querySelector('.star-picker');
+    var box = picker.querySelector('.sp-stars');
+    box.innerHTML = '';
+    var cur = getStars(a.id);
+    for (var s = 1; s <= 5; s++) {
+      (function (val) {
+        var b = document.createElement('button');
+        b.className = 'sp-star' + (val <= cur ? ' on' : '');
+        b.type = 'button';
+        b.textContent = val <= cur ? '★' : '☆';
+        b.addEventListener('click', function () { picker.hidden = true; applyTriage(node, a, 'important', val); });
+        box.appendChild(b);
+      })(s);
+    }
+    picker.querySelector('.sp-cancel').onclick = function () { picker.hidden = true; };
+    picker.hidden = false;
+  }
+
+  // ---------- triage: archive / important (+stars) ----------
+  function archive(a) {
+    var e = stEntry(a.id);
+    e.archived = 1; delete e.important; delete e.stars;
+    persistState();
+  }
+  function setImportant(a, stars) {
+    var e = stEntry(a.id);
+    e.important = 1; e.stars = stars; delete e.archived;
+    persistState();
+  }
+  function applyTriage(node, a, kind, stars) {
+    if (kind === 'archive') archive(a); else setImportant(a, stars);
     updateCounts();
-    if (node && a) {
-      if (!matchesView(a)) removeCard(node);
-      else paintState(node, a);
+    if (matchesView(a)) {                 // stays in current view
+      node.style.transition = 'transform .2s ease';
+      node.style.transform = '';
+      paintState(node, a);
+    } else {                              // left the view: slide off in swipe direction
+      node.style.transition = 'transform .24s ease, opacity .24s ease';
+      node.style.transform = 'translateX(' + (kind === 'archive' ? '-115%' : '115%') + ')';
+      node.style.opacity = '0';
+      setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); showEmptyState(); }, 230);
     }
   }
   function removeCard(node) {
@@ -324,9 +397,9 @@
   // ---------- peeks ----------
   function togglePeek(node, boxSel, btn) {
     var box = node.querySelector(boxSel);
-    var open = btn.getAttribute('aria-expanded') === 'true';
+    var open = !box.hidden;
     box.hidden = open;
-    btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    if (btn) btn.setAttribute('aria-expanded', open ? 'false' : 'true');
   }
 
   function loadAbstracts() {
@@ -447,20 +520,6 @@
     }, { rootMargin: '600px' }).observe(sentinelEl);
   }
 
-  // auto-mark-read: once a card has been on screen and then scrolls off the TOP
-  if ('IntersectionObserver' in window) {
-    readObserver = new IntersectionObserver(function (entries) {
-      entries.forEach(function (en) {
-        var node = en.target;
-        if (en.isIntersecting) { node.dataset.seen = '1'; return; }
-        if (node.dataset.seen === '1' && en.boundingClientRect.top < 0) {
-          var pmid = node.dataset.pmid;
-          if (pmid && !isRead(pmid)) setRead(pmid, true, node, allById[pmid], { noRemove: true });
-          readObserver.unobserve(node);
-        }
-      });
-    }, { threshold: 0 });
-  }
 
   // restore UI prefs
   sortBtn.textContent = prefs.sort === 'oldest' ? 'Oldest' : 'Newest';

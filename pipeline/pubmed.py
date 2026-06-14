@@ -139,11 +139,7 @@ def _authors(authors):
     names = [a.get("name", "") for a in authors if a.get("authtype", "Author") == "Author" and a.get("name")]
     if not names:
         names = [a.get("name", "") for a in authors if a.get("name")]
-    if not names:
-        return ""
-    if len(names) <= 3:
-        return ", ".join(names)
-    return names[0] + ", et al."
+    return ", ".join(names)  # full list; the app shows it in an Authors peek
 
 
 def _date(s):

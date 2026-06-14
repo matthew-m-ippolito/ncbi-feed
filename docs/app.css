@@ -13,6 +13,9 @@
   --notable-fg: #9a5b00;
   --notable-border: #ffd8a8;
   --notable-accent: #f59f00;
+  --important-accent: #f59f00;
+  --important-tint: #fff7e3;
+  --archive-tint: #fdeeee;
   --border: #e2e7e8;
   --shadow: 0 1px 2px rgba(20, 40, 45, .06), 0 1px 8px rgba(20, 40, 45, .04);
   --header-h: 144px;
@@ -35,6 +38,9 @@
     --notable-fg: #ffcf8f;
     --notable-border: #5c4413;
     --notable-accent: #f59f00;
+    --important-accent: #f5b53d;
+    --important-tint: #2a2208;
+    --archive-tint: #2e1d1d;
     --border: #243234;
     --shadow: none;
   }
@@ -149,9 +155,32 @@ body {
   box-shadow: var(--shadow);
   content-visibility: auto;
   contain-intrinsic-size: auto 150px;
+  position: relative;
+  touch-action: pan-y;
 }
-.card.is-read { opacity: .62; }
+.card.is-archived { opacity: .55; }
+.card.is-important { border-left: 3px solid var(--important-accent); }
 .card.is-new { border-color: var(--accent); }
+.card.swiping { box-shadow: 0 6px 20px rgba(20,40,45,.16); }
+.card.swipe-arch { background: var(--archive-tint); }
+.card.swipe-imp { background: var(--important-tint); }
+.card-main { cursor: pointer; }
+
+.card-stars { color: var(--important-accent); font-size: .95rem; letter-spacing: 1px; margin-bottom: 4px; }
+
+/* star rating prompt (after swipe-right) */
+.star-picker {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 11px; padding: 8px 10px;
+  background: var(--important-tint);
+  border: 1px solid var(--important-accent);
+  border-radius: 10px;
+}
+.sp-label { font-size: .8rem; font-weight: 650; color: var(--notable-fg); }
+.sp-stars { display: inline-flex; gap: 2px; }
+.sp-star { background: none; border: none; font-size: 1.5rem; line-height: 1; color: var(--important-accent); padding: 0 2px; }
+.sp-cancel { margin-left: auto; background: none; border: none; color: var(--faint); font-size: 1.1rem; }
+.authors-text { margin: 0; font-size: .88rem; line-height: 1.45; color: var(--muted); }
 
 .card-main { display: block; text-decoration: none; color: inherit; }
 .headline {
