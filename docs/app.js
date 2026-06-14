@@ -167,9 +167,9 @@
     edit.setAttribute('aria-label', 'Edit project tags');
     edit.addEventListener('click', function () {
       var peek = node.querySelector('.proj-editor');
-      var open = !peek.hidden;
-      peek.hidden = open;
-      if (!open) renderProjEditor(node, a);
+      var willOpen = peek.hidden;
+      closePeeks(node);               // collapse any other open peek first
+      if (willOpen) { peek.hidden = false; renderProjEditor(node, a); }
     });
     box.appendChild(edit);
   }
@@ -198,6 +198,7 @@
     setCount('inbox', inbox);
     setCount('important', important);
     setCount('archive', archive);
+    if (exportBtn) exportBtn.textContent = important > 0 ? ('Export ★' + important) : 'Export';
   }
   function setCount(view, n) {
     var el = document.querySelector('.tab-count[data-count="' + view + '"]');
@@ -228,17 +229,22 @@
     rendered = 0;
     renderMore();
     showEmptyState();
-    if (exportBtn) exportBtn.textContent = 'Export ' + visible.length;
   }
 
   function csvCell(v) {
     return '"' + (v == null ? '' : String(v)).replace(/"/g, '""') + '"';
   }
+  function savedItems() {
+    return allArticles.filter(function (a) { return isImportant(a.id); })
+      .sort(function (x, y) { return (getStars(y.id) - getStars(x.id)) || (y._t - x._t); });
+  }
   function exportCSV() {
+    var items = savedItems();
+    if (!items.length) { alert('No saved articles yet — swipe a card right (★) to save it, then export.'); return; }
     var cols = ['labels', 'author', 'year', 'title', 'journal', 'summary', 'stars', 'link'];
     var rows = [cols.join(',')];
-    for (var i = 0; i < visible.length; i++) {
-      var a = visible[i];
+    for (var i = 0; i < items.length; i++) {
+      var a = items[i];
       var d = parseDate(a.date);
       rows.push([
         effProjects(a).join('; '),
@@ -251,7 +257,7 @@
         a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/')
       ].map(csvCell).join(','));
     }
-    var fname = 'malaria-feed-' + prefs.view + '-' + visible.length + '.csv';
+    var fname = 'malaria-feed-saved-' + items.length + '.csv';
     var blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     try {                                   // iOS: native share sheet (Save to Files, email, AirDrop)
       var file = new File([blob], fname, { type: 'text/csv' });
@@ -421,12 +427,18 @@
     setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); showEmptyState(); }, 180);
   }
 
-  // ---------- peeks ----------
+  // ---------- peeks (only one open per card) ----------
+  function closePeeks(node) {
+    var peeks = node.querySelectorAll('.peek');
+    for (var i = 0; i < peeks.length; i++) peeks[i].hidden = true;
+    var btns = node.querySelectorAll('.act');
+    for (var j = 0; j < btns.length; j++) btns[j].setAttribute('aria-expanded', 'false');
+  }
   function togglePeek(node, boxSel, btn) {
     var box = node.querySelector(boxSel);
-    var open = !box.hidden;
-    box.hidden = open;
-    if (btn) btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+    var willOpen = box.hidden;
+    closePeeks(node);                 // collapse any other open peek first
+    if (willOpen) { box.hidden = false; if (btn) btn.setAttribute('aria-expanded', 'true'); }
   }
 
   function loadAbstracts() {
@@ -442,12 +454,11 @@
   function toggleAbstract(node, a) {
     var box = node.querySelector('.abstract');
     var btn = node.querySelector('.abstract-btn');
-    var expanded = btn.getAttribute('aria-expanded') === 'true';
-    if (expanded) { box.hidden = true; btn.setAttribute('aria-expanded', 'false'); return; }
+    var willOpen = box.hidden;
+    closePeeks(node);                 // collapse any other open peek first
+    if (!willOpen) return;            // was open -> now closed
     btn.setAttribute('aria-expanded', 'true');
     box.hidden = false;
-    var link = node.querySelector('.fulltext-link');
-    link.href = a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/');
     var txt = node.querySelector('.abstract-text');
     if (txt.dataset.loaded) return;
     txt.textContent = 'Loading abstract…';
