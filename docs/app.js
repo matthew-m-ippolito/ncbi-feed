@@ -10,9 +10,9 @@
   };
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
-  var PROJECTS = ['CHASM', 'Computer Vision', 'Drug Resistance', 'Forecasting', 'Genomics',
-    'ICEMR', 'IMPRINT', 'MACEPA', 'MARSHAL', 'New Drugs', 'Other', 'PDMC', 'PharCide',
-    'Pharmacokinetics', 'PLATFORM', 'Review', 'Serology', 'VSA'];
+  var PROJECTS = ['CHASM', 'Computer Vision', 'Drug Resistance', 'Drugs', 'Forecasting',
+    'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MARSHAL', 'PDMC', 'PharCide', 'PK/PD',
+    'PLATFORM', 'Review', 'Serology', 'VSA', 'Other'];
 
   // ---------- defensive storage ----------
   function load(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
