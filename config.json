@@ -1,0 +1,26 @@
+{
+  "feed_name": "Daily Malaria Updates",
+  "app_title": "Malaria Feed",
+  "query": "malaria[ti] OR plasmodium[ti]",
+  "mindate": "2025/07/13",
+  "eutils": {
+    "tool": "ncbi-feed",
+    "email": "foundling11946@gmail.com",
+    "api_key": ""
+  },
+  "headlines": {
+    "method": "claude-cli",
+    "model": "claude-haiku-4-5",
+    "batch_size": 30,
+    "max_words": 12,
+    "abstract_chars": 700
+  },
+  "daily_reldate_days": 3,
+  "feed_cap": 0,
+  "paths": {
+    "docs": "docs",
+    "articles": "docs/articles.json",
+    "abstracts": "docs/abstracts.json",
+    "state": "state.json"
+  }
+}

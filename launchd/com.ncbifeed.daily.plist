@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.ncbifeed.daily</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/caffeinate</string>
+    <string>-i</string>
+    <string>/opt/homebrew/bin/python3</string>
+    <string>/Users/Home/Research/Articles of Interest/_ncbi-feed-app/pipeline/run.py</string>
+  </array>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/Users/Home/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>NCBI_FEED_SECRETS</key>
+    <string>/Users/Home/.config/ncbi-feed/secrets.env</string>
+  </dict>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/Home/Research/Articles of Interest/_ncbi-feed-app</string>
+
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+
+  <key>RunAtLoad</key><false/>
+
+  <key>StandardOutPath</key>
+  <string>/Users/Home/Research/Articles of Interest/_ncbi-feed-app/logs/daily.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/Home/Research/Articles of Interest/_ncbi-feed-app/logs/daily.err.log</string>
+</dict>
+</plist>

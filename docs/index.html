@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Malaria Feed</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+
+<!-- iOS "Add to Home Screen" -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Malaria Feed">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<meta name="theme-color" content="#0b7285" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0b1416" media="(prefers-color-scheme: dark)">
+
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header class="app-header">
+  <div class="header-row">
+    <h1 class="app-title">Malaria Feed</h1>
+    <span id="updated" class="updated" aria-live="polite"></span>
+  </div>
+  <div class="search-wrap">
+    <input id="search" class="search" type="search" inputmode="search"
+           placeholder="Search headlines & titles" autocomplete="off"
+           autocorrect="off" autocapitalize="none" enterkeyhint="search">
+    <button id="sort-btn" class="sort-btn" type="button" title="Sort by date">Newest</button>
+  </div>
+</header>
+
+<button id="new-pill" class="new-pill" type="button" hidden></button>
+
+<main id="feed" class="feed" aria-live="polite"></main>
+
+<div id="loading" class="state">Loading your feed…</div>
+<div id="empty" class="state" hidden></div>
+<div id="error" class="state" hidden>
+  <p>Couldn't load your feed right now.</p>
+  <button id="retry" class="btn" type="button">Try again</button>
+</div>
+<div id="sentinel" aria-hidden="true"></div>
+
+<nav class="tabbar" role="tablist">
+  <button class="tab" role="tab" data-view="all" aria-selected="true">
+    <span class="tab-label">All</span><span class="tab-count" data-count="all"></span>
+  </button>
+  <button class="tab" role="tab" data-view="unread" aria-selected="false">
+    <span class="tab-label">Unread</span><span class="tab-count" data-count="unread"></span>
+  </button>
+  <button class="tab" role="tab" data-view="starred" aria-selected="false">
+    <span class="tab-label">Starred</span><span class="tab-count" data-count="starred"></span>
+  </button>
+</nav>
+
+<template id="card-tpl">
+  <article class="card" data-pmid="">
+    <a class="card-main" href="#" target="_blank" rel="noopener">
+      <h2 class="headline"></h2>
+      <p class="orig-title"></p>
+    </a>
+    <div class="meta-row">
+      <span class="meta"><span class="journal"></span><span class="meta-dot"> · </span><span class="date"></span></span>
+      <span class="chip source"></span>
+    </div>
+    <div class="card-actions">
+      <button class="act abstract-btn" type="button" aria-expanded="false">Abstract</button>
+      <button class="act read-btn" type="button" aria-pressed="false">Mark read</button>
+      <button class="act star-btn" type="button" aria-pressed="false" aria-label="Star for later">
+        <span class="star-ico" aria-hidden="true">☆</span><span class="star-txt">Star</span>
+      </button>
+    </div>
+    <div class="abstract" hidden>
+      <p class="abstract-text"></p>
+      <a class="fulltext-link" target="_blank" rel="noopener">Open full text on PubMed&nbsp;↗</a>
+    </div>
+  </article>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>

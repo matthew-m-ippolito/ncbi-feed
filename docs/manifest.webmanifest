@@ -1,0 +1,16 @@
+{
+  "name": "Malaria Feed",
+  "short_name": "Malaria Feed",
+  "description": "Plain-language headlines from your NCBI PubMed alerts.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1416",
+  "theme_color": "#0b7285",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

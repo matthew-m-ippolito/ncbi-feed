@@ -1,0 +1,9 @@
+state.json
+logs/
+__pycache__/
+*.pyc
+secrets.env
+*.env
+.DS_Store
+.venv/
+pipeline/.cache/
