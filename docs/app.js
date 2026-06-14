@@ -72,6 +72,29 @@
     return 'Updated ' + d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   }
 
+  // ---------- high-impact journals (edit this list freely) ----------
+  var HIGH_JOURNAL_EXACT = {
+    'n engl j med': 1, 'lancet': 1, 'nature': 1, 'science': 1, 'cell': 1, 'jama': 1,
+    'bmj': 1, 'proc natl acad sci u s a': 1,
+    'nat med': 1, 'nat microbiol': 1, 'nat immunol': 1, 'nat genet': 1, 'nat commun': 1,
+    'nat biotechnol': 1, 'nat methods': 1, 'nat metab': 1, 'nat ecol evol': 1,
+    'sci transl med': 1, 'sci immunol': 1,
+    'immunity': 1, 'cell host microbe': 1, 'mol cell': 1, 'cancer cell': 1,
+    'plos med': 1, 'plos biol': 1, 'elife': 1, 'j exp med': 1, 'embo j': 1, 'blood': 1,
+    'clin infect dis': 1, 'lancet infect dis': 1, 'lancet microbe': 1,
+    'lancet glob health': 1, 'lancet public health': 1, 'lancet haematol': 1
+  };
+  var HIGH_JOURNAL_PREFIX = ['lancet ', 'nat rev ', 'jama '];
+  function isHighJournal(j) {
+    if (!j) return false;
+    var s = j.toLowerCase().trim().replace(/\.$/, '');
+    if (HIGH_JOURNAL_EXACT[s]) return true;
+    for (var i = 0; i < HIGH_JOURNAL_PREFIX.length; i++) {
+      if (s.indexOf(HIGH_JOURNAL_PREFIX[i]) === 0) return true;
+    }
+    return false;
+  }
+
   // ---------- counts ----------
   function updateCounts() {
     var unread = 0, starred = 0;
@@ -142,7 +165,9 @@
     var detailsBtn = node.querySelector('.details-btn');
     if (!a.title_original) titleBtn.style.display = 'none';
     if (!a.details) detailsBtn.style.display = 'none';
-    node.querySelector('.journal').textContent = a.journal || '';
+    var jEl = node.querySelector('.journal');
+    jEl.textContent = a.journal || '';
+    if (isHighJournal(a.journal)) jEl.classList.add('high-impact');
     var dt = node.querySelector('.date'); dt.textContent = fmtDate(a.date);
     if (!a.journal || !dt.textContent) node.querySelector('.meta-dot').style.display = 'none';
     var chip = node.querySelector('.source');
@@ -152,6 +177,12 @@
     if (!a.has_abstract) abBtn.style.display = 'none';
 
     if (newIds[a.id]) node.classList.add('is-new');
+    if (a.notable) {
+      node.classList.add('is-notable');
+      var nb = node.querySelector('.notable-badge');
+      nb.hidden = false;
+      nb.querySelector('.notable-text').textContent = a.notable_reason || 'Notable finding';
+    }
     paintState(node, a);
 
     // open PubMed + mark read

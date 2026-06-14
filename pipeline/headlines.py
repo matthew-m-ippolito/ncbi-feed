@@ -16,23 +16,30 @@ CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "headlines.json")
 
 PROMPT_HEAD = (
-    "You summarize a biomedical article for a malaria researcher's feed. For EACH article, "
-    "using its TITLE and ABSTRACT, produce two things: "
+    "You summarize biomedical articles for a malaria researcher's feed. For EACH article, "
+    "using its TITLE and ABSTRACT, produce: "
     '(1) "headline": a short, plain-English headline of at most %d words capturing the topic '
-    "at a glance (scannable); and "
+    "at a glance (scannable); "
     '(2) "details": a detailed plain-English summary of 2-4 sentences (up to about %d words) '
     "giving the study design and population/sample size, the exact intervention, exposure, or "
     "question (specific drugs and doses, parasite species such as P. falciparum or P. vivax, "
     "and precise clinical entities such as cerebral malaria vs severe malarial anemia, or "
     "artemisinin partial resistance with Kelch13 mutations), and MOST IMPORTANTLY the main "
     "quantitative results (cure rates, prevalence %%, odds/hazard ratios, effect sizes, "
-    "p-values) and the authors' conclusion. "
-    "For BOTH fields: include ONLY facts and numbers stated in the abstract; NEVER invent or "
-    "estimate numbers, drugs, locations, or findings; if a detail is not in the abstract, omit "
-    "it. Prefer exact entities over vague words. No hype, no clickbait. If no abstract is "
-    "provided, base both on the title and do not fabricate results. "
-    "Output ONLY a JSON array, no prose and no code fence: "
-    '[{"id":"<id>","headline":"<short>","details":"<detailed>"}]'
+    "p-values) and the authors' conclusion; "
+    '(3) "notable": a boolean -- true ONLY if this is a likely paradigm-shifting, '
+    "practice-changing, or landmark advance (e.g. first demonstration of a major effect, a "
+    "novel mechanism or drug target with broad implications, a large definitive or phase-3 "
+    "trial likely to change guidelines, a major drug-resistance or transmission breakthrough, "
+    "a new vaccine efficacy result). Be CONSERVATIVE: the large majority of papers are "
+    "routine, incremental, descriptive, single-site, or review/protocol papers and must be "
+    'false; and (4) "notable_reason": if notable is true, at most 10 words on why; else "". '
+    "For headline and details: include ONLY facts and numbers stated in the abstract; NEVER "
+    "invent or estimate numbers, drugs, locations, or findings; if a detail is not in the "
+    "abstract, omit it. Prefer exact entities over vague words. No hype, no clickbait. If no "
+    "abstract is provided, base headline/details on the title, set notable false, and do not "
+    "fabricate results. Output ONLY a JSON array, no prose and no code fence: "
+    '[{"id":"<id>","headline":"<short>","details":"<detailed>","notable":false,"notable_reason":""}]'
     "\n\nArticles:\n"
 )
 
@@ -117,6 +124,8 @@ def _process_batch(batch, cfg):
                     res[str(o["id"])] = {
                         "headline": _trim(o["headline"]).rstrip("."),
                         "details": _trim(o.get("details", "")),
+                        "notable": bool(o.get("notable")),
+                        "notable_reason": _trim(o.get("notable_reason", "")),
                     }
             if all(it["id"] in res for it in batch):
                 break
@@ -158,7 +167,8 @@ def generate(items, cfg, log=print):
                     cache[it["id"]] = res[it["id"]]
                 else:
                     out[it["id"]] = {"headline": clean_title(it["title"]),
-                                     "details": clean_title(it["title"])}
+                                     "details": clean_title(it["title"]),
+                                     "notable": False, "notable_reason": ""}
             done += 1
             if done % 5 == 0 or done == len(batches):
                 log("    %d/%d batches" % (done, len(batches)))

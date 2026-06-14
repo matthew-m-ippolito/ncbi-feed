@@ -142,6 +142,8 @@ def main():
             "url": m.get("url") or ("https://pubmed.ncbi.nlm.nih.gov/%s/" % pid),
             "has_abstract": pid in abmap,
             "has_details": bool(hd.get("details")),
+            "notable": bool(hd.get("notable")),
+            "notable_reason": hd.get("notable_reason", ""),
         }
 
     abstracts_store = store.load_abstracts(abs_path)
@@ -177,6 +179,8 @@ def regen_headlines(cfg, art_path, abs_path):
             a["headline"] = hd["headline"]
             a["details"] = hd.get("details", "")
             a["has_details"] = bool(hd.get("details"))
+            a["notable"] = bool(hd.get("notable"))
+            a["notable_reason"] = hd.get("notable_reason", "")
             changed += 1
     gen = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     n = store.save_articles(art_path, existing, gen, cap=cfg.get("feed_cap", 0))

@@ -8,6 +8,11 @@
   --accent: #0b7285;
   --accent-weak: #d7ebef;
   --star: #e8a317;
+  --hi-journal: #e8590c;
+  --notable-bg: #fff4e0;
+  --notable-fg: #9a5b00;
+  --notable-border: #ffd8a8;
+  --notable-accent: #f59f00;
   --border: #e2e7e8;
   --shadow: 0 1px 2px rgba(20, 40, 45, .06), 0 1px 8px rgba(20, 40, 45, .04);
   --header-h: 104px;
@@ -25,6 +30,11 @@
     --accent: #3bb6cf;
     --accent-weak: #11343c;
     --star: #f2bd4d;
+    --hi-journal: #fd7e14;
+    --notable-bg: #2a2008;
+    --notable-fg: #ffcf8f;
+    --notable-border: #5c4413;
+    --notable-accent: #f59f00;
     --border: #243234;
     --shadow: none;
   }
@@ -148,6 +158,34 @@ body {
   background: var(--accent-weak);
   color: var(--accent);
   white-space: nowrap;
+}
+
+/* high-impact journal: orange oval */
+.journal.high-impact {
+  display: inline-block;
+  background: var(--hi-journal);
+  color: #fff;
+  padding: 1px 9px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: .72rem;
+}
+
+/* notable / game-changing science */
+.card.is-notable { border-left: 3px solid var(--notable-accent); }
+.notable-badge {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin: 9px 0 0;
+  padding: 4px 10px;
+  background: var(--notable-bg);
+  color: var(--notable-fg);
+  border: 1px solid var(--notable-border);
+  border-radius: 9px;
+  font-size: .76rem;
+  font-weight: 650;
+  line-height: 1.35;
 }
 
 /* ---------- Actions ---------- */
