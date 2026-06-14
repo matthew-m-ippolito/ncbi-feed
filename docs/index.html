@@ -61,20 +61,25 @@
   <article class="card" data-pmid="">
     <a class="card-main" href="#" target="_blank" rel="noopener">
       <h2 class="headline"></h2>
-      <p class="orig-title"></p>
     </a>
     <div class="meta-row">
       <span class="meta"><span class="journal"></span><span class="meta-dot"> · </span><span class="date"></span></span>
       <span class="chip source"></span>
     </div>
     <div class="card-actions">
+      <button class="act title-btn" type="button" aria-expanded="false">Title</button>
       <button class="act abstract-btn" type="button" aria-expanded="false">Abstract</button>
       <button class="act read-btn" type="button" aria-pressed="false">Mark read</button>
-      <button class="act star-btn" type="button" aria-pressed="false" aria-label="Star for later">
-        <span class="star-ico" aria-hidden="true">☆</span><span class="star-txt">Star</span>
+      <button class="act act-icon star-btn" type="button" aria-pressed="false" aria-label="Star for later">
+        <span class="star-ico" aria-hidden="true">☆</span>
       </button>
     </div>
-    <div class="abstract" hidden>
+    <div class="title-peek peek" hidden>
+      <p class="peek-label">Original title</p>
+      <p class="orig-title"></p>
+    </div>
+    <div class="abstract peek" hidden>
+      <p class="peek-label">Abstract</p>
       <p class="abstract-text"></p>
       <a class="fulltext-link" target="_blank" rel="noopener">Open full text on PubMed&nbsp;↗</a>
     </div>

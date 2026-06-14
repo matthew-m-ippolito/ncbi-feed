@@ -134,7 +134,8 @@ body {
   border: 1px solid var(--accent);
   border-radius: 5px;
 }
-.orig-title { margin: 5px 0 0; font-size: .82rem; color: var(--muted); line-height: 1.35; }
+.peek-label { margin: 0 0 5px; font-size: .64rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--faint); }
+.orig-title { margin: 0; font-size: .9rem; line-height: 1.4; color: var(--muted); }
 
 .meta-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
 .meta { font-size: .76rem; color: var(--faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -161,13 +162,14 @@ body {
   display: inline-flex; align-items: center; justify-content: center; gap: 5px;
 }
 .act:active { transform: scale(.97); }
+.act-icon { flex: 0 0 46px; font-size: 1.05rem; }
 .star-btn[aria-pressed="true"] { color: var(--star); border-color: var(--star); background: color-mix(in srgb, var(--star) 12%, var(--surface)); }
 .star-btn[aria-pressed="true"] .star-ico { font-size: 1.05em; }
 .read-btn[aria-pressed="true"] { color: var(--accent); border-color: var(--accent); }
 .abstract-btn[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 
-/* ---------- Abstract ---------- */
-.abstract { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
+/* ---------- Peeks (title / abstract) ---------- */
+.peek { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border); }
 .abstract-text { margin: 0; font-size: .9rem; line-height: 1.5; color: var(--text); white-space: pre-wrap; }
 .abstract-text.is-loading { color: var(--faint); }
 .fulltext-link { display: inline-block; margin-top: 10px; font-size: .85rem; font-weight: 600; color: var(--accent); text-decoration: none; }

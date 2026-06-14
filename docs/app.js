@@ -134,9 +134,9 @@
     var main = node.querySelector('.card-main');
     main.href = a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/');
     node.querySelector('.headline').textContent = a.headline || a.title_original || '(untitled)';
-    var ot = node.querySelector('.orig-title');
-    ot.textContent = a.title_original || '';
-    if (!a.title_original || a.title_original === a.headline) ot.style.display = 'none';
+    node.querySelector('.orig-title').textContent = a.title_original || '';
+    var titleBtn = node.querySelector('.title-btn');
+    if (!a.title_original) titleBtn.style.display = 'none';
     node.querySelector('.journal').textContent = a.journal || '';
     var dt = node.querySelector('.date'); dt.textContent = fmtDate(a.date);
     if (!a.journal || !dt.textContent) node.querySelector('.meta-dot').style.display = 'none';
@@ -151,6 +151,7 @@
 
     // open PubMed + mark read
     main.addEventListener('click', function () { setRead(a.id, true, node, a); });
+    titleBtn.addEventListener('click', function () { toggleTitle(node); });
     abBtn.addEventListener('click', function () { toggleAbstract(node, a); });
     node.querySelector('.read-btn').addEventListener('click', function () { setRead(a.id, !isRead(a.id), node, a); });
     node.querySelector('.star-btn').addEventListener('click', function () { toggleStar(a.id, node, a); });
@@ -166,7 +167,6 @@
     var sb = node.querySelector('.star-btn');
     sb.setAttribute('aria-pressed', starred ? 'true' : 'false');
     sb.querySelector('.star-ico').textContent = starred ? '★' : '☆';
-    sb.querySelector('.star-txt').textContent = starred ? 'Starred' : 'Star';
   }
 
   // ---------- state mutations ----------
@@ -196,7 +196,15 @@
     setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); showEmptyState(); }, 180);
   }
 
-  // ---------- abstracts ----------
+  // ---------- peeks ----------
+  function toggleTitle(node) {
+    var box = node.querySelector('.title-peek');
+    var btn = node.querySelector('.title-btn');
+    var open = btn.getAttribute('aria-expanded') === 'true';
+    box.hidden = open;
+    btn.setAttribute('aria-expanded', open ? 'false' : 'true');
+  }
+
   function loadAbstracts() {
     if (abstracts) return Promise.resolve(abstracts);
     if (abstractsPromise) return abstractsPromise;
