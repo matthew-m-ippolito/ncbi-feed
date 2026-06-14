@@ -60,6 +60,8 @@ def main():
     ap.add_argument("--days", type=int)
     ap.add_argument("--limit", type=int)
     ap.add_argument("--count-only", action="store_true")
+    ap.add_argument("--regen-headlines", action="store_true",
+                    help="rewrite headlines for all existing articles (no PubMed refetch)")
     ap.add_argument("--no-deploy", action="store_true")
     args = ap.parse_args()
 
@@ -68,6 +70,12 @@ def main():
     art_path = os.path.join(ROOT, p["articles"])
     abs_path = os.path.join(ROOT, p["abstracts"])
     state_path = os.path.join(ROOT, p["state"])
+
+    if args.regen_headlines:
+        regen_headlines(cfg, art_path, abs_path)
+        if not args.no_deploy:
+            deploy(cfg)
+        return
 
     e = cfg["eutils"]
     pm = pubmed.PubMed(e.get("tool", "ncbi-feed"), e.get("email", ""), e.get("api_key", ""))
@@ -120,9 +128,11 @@ def main():
     today = date.today().isoformat()
     for pid in usable:
         m = meta[pid]
+        hd = hmap.get(pid) or {}
         existing[pid] = {
             "id": pid, "pmid": pid,
-            "headline": hmap.get(pid) or headlines.clean_title(m["title"]),
+            "headline": hd.get("headline") or headlines.clean_title(m["title"]),
+            "details": hd.get("details", ""),
             "title_original": m["title"],
             "authors": m.get("authors", ""),
             "journal": m.get("journal", ""),
@@ -131,6 +141,7 @@ def main():
             "source": cfg["feed_name"],
             "url": m.get("url") or ("https://pubmed.ncbi.nlm.nih.gov/%s/" % pid),
             "has_abstract": pid in abmap,
+            "has_details": bool(hd.get("details")),
         }
 
     abstracts_store = store.load_abstracts(abs_path)
@@ -148,6 +159,28 @@ def main():
 
     if not args.no_deploy:
         deploy(cfg)
+
+
+def regen_headlines(cfg, art_path, abs_path):
+    """Rewrite every existing article's headline from stored title + abstract."""
+    existing = store.load_articles(art_path)
+    abmap = store.load_abstracts(abs_path)
+    headlines.clear_cache()  # force regeneration with the current prompt
+    items = [{"id": pid, "title": a.get("title_original", ""), "abstract": abmap.get(pid, "")}
+             for pid, a in existing.items()]
+    log("regenerating %d headlines ..." % len(items))
+    hmap = headlines.generate(items, cfg["headlines"], log=log)
+    changed = 0
+    for pid, a in existing.items():
+        hd = hmap.get(pid)
+        if hd and hd.get("headline"):
+            a["headline"] = hd["headline"]
+            a["details"] = hd.get("details", "")
+            a["has_details"] = bool(hd.get("details"))
+            changed += 1
+    gen = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    n = store.save_articles(art_path, existing, gen, cap=cfg.get("feed_cap", 0))
+    log("rewrote %d/%d headlines; wrote %d articles" % (changed, len(items), n))
 
 
 def deploy(cfg):

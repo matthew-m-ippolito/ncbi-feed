@@ -11,9 +11,11 @@
   "headlines": {
     "method": "claude-cli",
     "model": "claude-haiku-4-5",
-    "batch_size": 30,
-    "max_words": 12,
-    "abstract_chars": 700
+    "batch_size": 12,
+    "workers": 8,
+    "headline_words": 12,
+    "max_words": 90,
+    "abstract_chars": 3500
   },
   "daily_reldate_days": 3,
   "feed_cap": 0,

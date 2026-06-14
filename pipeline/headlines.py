@@ -1,8 +1,10 @@
-"""Plain-language headline generation via the local `claude` CLI (no API key).
+"""Plain-language headline + detailed-summary generation via the local `claude` CLI.
 
-Batches titles (+ abstract context) to `claude -p`, parses a JSON array back,
-caches successful headlines by PMID so each paper is rewritten only once, and
-falls back to a cleaned title if the model errors. Batches run concurrently.
+For each article, one model call produces BOTH:
+  - headline: short, scannable, <= headline_words words
+  - details : a 2-4 sentence summary carrying the study's specifics and main results
+Results are cached by PMID (so each paper is processed once); a model error falls
+back to a cleaned title. Batches run concurrently.
 """
 import json
 import os
@@ -14,11 +16,24 @@ CACHE_DIR = os.path.join(os.path.dirname(__file__), ".cache")
 CACHE_FILE = os.path.join(CACHE_DIR, "headlines.json")
 
 PROMPT_HEAD = (
-    "You rewrite technical biomedical article titles into plain-English news headlines "
-    "for a malaria researcher's feed. Rules: each headline <= %d words; accurate to the "
-    "title/abstract; no hype, no clickbait, no invented findings; plain vocabulary a "
-    "non-specialist understands; do not add facts not present. Output ONLY a JSON array, "
-    'no prose and no code fence: [{"id":"<id>","headline":"<headline>"}]\n\nArticles:\n'
+    "You summarize a biomedical article for a malaria researcher's feed. For EACH article, "
+    "using its TITLE and ABSTRACT, produce two things: "
+    '(1) "headline": a short, plain-English headline of at most %d words capturing the topic '
+    "at a glance (scannable); and "
+    '(2) "details": a detailed plain-English summary of 2-4 sentences (up to about %d words) '
+    "giving the study design and population/sample size, the exact intervention, exposure, or "
+    "question (specific drugs and doses, parasite species such as P. falciparum or P. vivax, "
+    "and precise clinical entities such as cerebral malaria vs severe malarial anemia, or "
+    "artemisinin partial resistance with Kelch13 mutations), and MOST IMPORTANTLY the main "
+    "quantitative results (cure rates, prevalence %%, odds/hazard ratios, effect sizes, "
+    "p-values) and the authors' conclusion. "
+    "For BOTH fields: include ONLY facts and numbers stated in the abstract; NEVER invent or "
+    "estimate numbers, drugs, locations, or findings; if a detail is not in the abstract, omit "
+    "it. Prefer exact entities over vague words. No hype, no clickbait. If no abstract is "
+    "provided, base both on the title and do not fabricate results. "
+    "Output ONLY a JSON array, no prose and no code fence: "
+    '[{"id":"<id>","headline":"<short>","details":"<detailed>"}]'
+    "\n\nArticles:\n"
 )
 
 
@@ -28,13 +43,21 @@ def clean_title(t):
 
 def _trim(h):
     h = re.sub(r"\s+", " ", str(h or "")).strip()
-    return h.strip('"').strip("'").rstrip(".").strip()
+    return h.strip('"').strip("'").strip()
+
+
+def clear_cache():
+    try:
+        os.remove(CACHE_FILE)
+    except OSError:
+        pass
 
 
 def _load_cache():
     try:
         with open(CACHE_FILE) as f:
-            return json.load(f)
+            c = json.load(f)
+        return c if isinstance(c, dict) else {}
     except Exception:
         return {}
 
@@ -47,13 +70,14 @@ def _save_cache(c):
     os.replace(tmp, CACHE_FILE)
 
 
-def _build_prompt(batch, max_words, abs_chars):
-    lines = [PROMPT_HEAD % max_words]
+def _build_prompt(batch, cfg):
+    lines = [PROMPT_HEAD % (cfg.get("headline_words", 12), cfg.get("max_words", 90))]
+    ac = cfg.get("abstract_chars", 3500)
     for it in batch:
         line = "id=%s | title=%s" % (it["id"], it["title"])
         ab = (it.get("abstract") or "").strip()
         if ab:
-            line += " | abstract=" + ab[:abs_chars].replace("\n", " ")
+            line += " | abstract=" + ab[:ac].replace("\n", " ")
         lines.append(line)
     return "\n".join(lines)
 
@@ -79,39 +103,43 @@ def _call_claude(prompt, model, timeout):
 
 
 def _process_batch(batch, cfg):
-    prompt = _build_prompt(batch, cfg["max_words"], cfg["abstract_chars"])
+    prompt = _build_prompt(batch, cfg)
     res = {}
     for _ in range(2):  # one retry if incomplete/malformed
         try:
-            out = _call_claude(prompt, cfg["model"], cfg.get("timeout", 180))
+            out = _call_claude(prompt, cfg["model"], cfg.get("timeout", 240))
         except Exception:
             out = ""
         arr = _extract_json(out)
         if arr:
             for o in arr:
                 if isinstance(o, dict) and o.get("id") and o.get("headline"):
-                    res[str(o["id"])] = _trim(o["headline"])
+                    res[str(o["id"])] = {
+                        "headline": _trim(o["headline"]).rstrip("."),
+                        "details": _trim(o.get("details", "")),
+                    }
             if all(it["id"] in res for it in batch):
                 break
     return res
 
 
 def generate(items, cfg, log=print):
-    """items: [{id, title, abstract}] -> {id: headline}. Caches LLM headlines."""
+    """items: [{id, title, abstract}] -> {id: {headline, details}}. Caches results."""
     cache = _load_cache()
     out = {}
     todo = []
     for it in items:
-        if it["id"] in cache:
-            out[it["id"]] = cache[it["id"]]
+        c = cache.get(it["id"])
+        if isinstance(c, dict) and c.get("headline"):
+            out[it["id"]] = c
         else:
             todo.append(it)
     if not todo:
         return out
 
-    bs = max(1, int(cfg.get("batch_size", 30)))
+    bs = max(1, int(cfg.get("batch_size", 12)))
     batches = [todo[i:i + bs] for i in range(0, len(todo), bs)]
-    workers = max(1, int(cfg.get("workers", 6)))
+    workers = max(1, int(cfg.get("workers", 8)))
     log("  headlines: %d cached, %d new in %d batches (x%d workers)"
         % (len(out), len(todo), len(batches), workers))
 
@@ -125,11 +153,12 @@ def generate(items, cfg, log=print):
             except Exception:
                 res = {}
             for it in b:
-                if it["id"] in res:
+                if it["id"] in res and res[it["id"]].get("headline"):
                     out[it["id"]] = res[it["id"]]
-                    cache[it["id"]] = res[it["id"]]       # cache real headlines only
+                    cache[it["id"]] = res[it["id"]]
                 else:
-                    out[it["id"]] = clean_title(it["title"])  # fallback; retried next run
+                    out[it["id"]] = {"headline": clean_title(it["title"]),
+                                     "details": clean_title(it["title"])}
             done += 1
             if done % 5 == 0 or done == len(batches):
                 log("    %d/%d batches" % (done, len(batches)))

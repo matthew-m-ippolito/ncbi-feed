@@ -19,12 +19,14 @@
   var meta  = load(LS.meta, { seenIds: [] });
 
   var allArticles = [];
+  var allById = {};
   var visible = [];
   var rendered = 0;
   var searchTerm = '';
   var abstracts = null, abstractsPromise = null;
   var newIds = {};
   var freshData = null;
+  var readObserver = null;
 
   // ---------- DOM ----------
   var feedEl = document.getElementById('feed');
@@ -135,8 +137,11 @@
     main.href = a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/');
     node.querySelector('.headline').textContent = a.headline || a.title_original || '(untitled)';
     node.querySelector('.orig-title').textContent = a.title_original || '';
+    node.querySelector('.details-text').textContent = a.details || '';
     var titleBtn = node.querySelector('.title-btn');
+    var detailsBtn = node.querySelector('.details-btn');
     if (!a.title_original) titleBtn.style.display = 'none';
+    if (!a.details) detailsBtn.style.display = 'none';
     node.querySelector('.journal').textContent = a.journal || '';
     var dt = node.querySelector('.date'); dt.textContent = fmtDate(a.date);
     if (!a.journal || !dt.textContent) node.querySelector('.meta-dot').style.display = 'none';
@@ -151,30 +156,32 @@
 
     // open PubMed + mark read
     main.addEventListener('click', function () { setRead(a.id, true, node, a); });
-    titleBtn.addEventListener('click', function () { toggleTitle(node); });
+    detailsBtn.addEventListener('click', function () { togglePeek(node, '.details-peek', detailsBtn); });
+    titleBtn.addEventListener('click', function () { togglePeek(node, '.title-peek', titleBtn); });
     abBtn.addEventListener('click', function () { toggleAbstract(node, a); });
-    node.querySelector('.read-btn').addEventListener('click', function () { setRead(a.id, !isRead(a.id), node, a); });
     node.querySelector('.star-btn').addEventListener('click', function () { toggleStar(a.id, node, a); });
+    if (readObserver && !isRead(a.id)) readObserver.observe(node);
     return node;
   }
 
   function paintState(node, a) {
     var read = isRead(a.id), starred = isStarred(a.id);
     node.classList.toggle('is-read', read);
-    var rb = node.querySelector('.read-btn');
-    rb.setAttribute('aria-pressed', read ? 'true' : 'false');
-    rb.textContent = read ? 'Read ✓' : 'Mark read';
     var sb = node.querySelector('.star-btn');
     sb.setAttribute('aria-pressed', starred ? 'true' : 'false');
     sb.querySelector('.star-ico').textContent = starred ? '★' : '☆';
   }
 
   // ---------- state mutations ----------
-  function setRead(pmid, val, node, a) {
+  function setRead(pmid, val, node, a, opts) {
     var e = stEntry(pmid);
     if (val) { e.read = 1; e.readAt = Date.now(); } else { delete e.read; delete e.readAt; }
     persistState();
-    afterChange(node, a);
+    updateCounts();
+    if (node && a) {
+      if (!(opts && opts.noRemove) && !matchesView(a)) removeCard(node);
+      else paintState(node, a);
+    }
   }
   function toggleStar(pmid, node, a) {
     var e = stEntry(pmid);
@@ -197,9 +204,8 @@
   }
 
   // ---------- peeks ----------
-  function toggleTitle(node) {
-    var box = node.querySelector('.title-peek');
-    var btn = node.querySelector('.title-btn');
+  function togglePeek(node, boxSel, btn) {
+    var box = node.querySelector(boxSel);
     var open = btn.getAttribute('aria-expanded') === 'true';
     box.hidden = open;
     btn.setAttribute('aria-expanded', open ? 'false' : 'true');
@@ -241,11 +247,13 @@
     a.id = String(a.id || a.pmid || '');
     var d = parseDate(a.date) || parseDate(a.date_added);
     a._t = d ? d.getTime() : 0;
-    a._hay = ((a.headline || '') + ' ' + (a.title_original || '') + ' ' +
+    a._hay = ((a.headline || '') + ' ' + (a.details || '') + ' ' + (a.title_original || '') + ' ' +
               (a.journal || '') + ' ' + (a.authors || '')).toLowerCase();
+    allById[a.id] = a;
     return a;
   }
   function ingest(data, isFresh) {
+    allById = {};
     allArticles = (data.articles || []).map(indexArticle);
     updatedEl.textContent = data.generated_at ? relTime(data.generated_at) : '';
     computeNew();
@@ -318,6 +326,21 @@
     new IntersectionObserver(function (entries) {
       if (entries[0].isIntersecting && rendered < visible.length) renderMore();
     }, { rootMargin: '600px' }).observe(sentinelEl);
+  }
+
+  // auto-mark-read: once a card has been on screen and then scrolls off the TOP
+  if ('IntersectionObserver' in window) {
+    readObserver = new IntersectionObserver(function (entries) {
+      entries.forEach(function (en) {
+        var node = en.target;
+        if (en.isIntersecting) { node.dataset.seen = '1'; return; }
+        if (node.dataset.seen === '1' && en.boundingClientRect.top < 0) {
+          var pmid = node.dataset.pmid;
+          if (pmid && !isRead(pmid)) setRead(pmid, true, node, allById[pmid], { noRemove: true });
+          readObserver.unobserve(node);
+        }
+      });
+    }, { threshold: 0 });
   }
 
   // restore UI prefs

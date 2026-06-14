@@ -67,12 +67,16 @@
       <span class="chip source"></span>
     </div>
     <div class="card-actions">
+      <button class="act details-btn" type="button" aria-expanded="false">Details</button>
       <button class="act title-btn" type="button" aria-expanded="false">Title</button>
       <button class="act abstract-btn" type="button" aria-expanded="false">Abstract</button>
-      <button class="act read-btn" type="button" aria-pressed="false">Mark read</button>
       <button class="act act-icon star-btn" type="button" aria-pressed="false" aria-label="Star for later">
         <span class="star-ico" aria-hidden="true">☆</span>
       </button>
+    </div>
+    <div class="details-peek peek" hidden>
+      <p class="peek-label">Summary</p>
+      <p class="details-text"></p>
     </div>
     <div class="title-peek peek" hidden>
       <p class="peek-label">Original title</p>
