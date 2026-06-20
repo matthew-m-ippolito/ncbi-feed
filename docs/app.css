@@ -154,32 +154,31 @@ body {
 .undo-toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 12px);
   z-index: 40;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   max-width: calc(100vw - 28px);
-  padding: 9px 8px 9px 16px;
-  border-radius: 11px;
-  background: #1d2a29;
-  border: 1px solid rgba(255, 255, 255, .14);
-  box-shadow: 0 6px 22px rgba(0, 0, 0, .32);
+  padding: 4px 4px 4px 12px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: 0 2px 10px rgba(20, 40, 45, .14);
   opacity: 0;
-  transform: translate(-50%, 18px);
+  transform: translate(-50%, 10px);
   pointer-events: none;
-  transition: opacity .2s ease, transform .2s ease;
+  transition: opacity .18s ease, transform .18s ease;
 }
-.undo-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-.undo-msg { color: #eef3f2; font-size: .9rem; font-weight: 500; }
+.undo-toast.show { opacity: .96; transform: translate(-50%, 0); pointer-events: auto; }
+.undo-msg { color: var(--muted); font-size: .78rem; font-weight: 500; }
 .undo-btn {
   appearance: none; -webkit-appearance: none;
   border: none; background: transparent;
-  color: var(--star); font-size: .9rem; font-weight: 800;
-  letter-spacing: .03em; text-transform: uppercase;
-  padding: 6px 12px; min-height: 36px; cursor: pointer;
+  color: var(--text); font-size: .78rem; font-weight: 700;
+  padding: 5px 9px; min-height: 30px; cursor: pointer;
 }
-.undo-btn:active { opacity: .55; }
+.undo-btn:active { opacity: .5; }
 
 /* ---------- Feed ---------- */
 .feed {

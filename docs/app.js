@@ -487,7 +487,7 @@
     void undoToast.offsetWidth;                 // force reflow so the slide-in transition runs
     undoToast.classList.add('show');
     clearTimeout(undoTimer);
-    undoTimer = setTimeout(hideUndo, 5000);
+    undoTimer = setTimeout(hideUndo, 3500);
   }
   function hideUndo() {
     clearTimeout(undoTimer);
