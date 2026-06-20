@@ -282,6 +282,14 @@ body {
 }
 .proj-chip:active { transform: scale(.96); }
 .proj-edit-chip { background: transparent; border: 1px dashed var(--border); color: var(--faint); font-weight: 600; }
+.note-chip { background: transparent; border: 1px dashed var(--border); color: var(--faint); font-weight: 600; }
+.note-chip.has-note { border-style: solid; border-color: var(--star); color: var(--star); background: color-mix(in srgb, var(--star) 12%, var(--surface)); }
+.note-text {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 64px;
+  font: inherit; font-size: 16px; line-height: 1.4;
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-2); color: var(--text); appearance: none;
+}
 
 /* manual "file under projects" editor */
 .proj-editor-chips { display: flex; flex-wrap: wrap; gap: 6px; }

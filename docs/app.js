@@ -12,8 +12,8 @@
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
   var PROJECTS = ['CHASM', 'CV', 'Drug Resistance', 'Drugs', 'Forecasting',
-    'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MARSHAL', 'Modeling', 'PDMC', 'PharCide',
-    'PK/PD', 'PLATFORM', 'Review', 'Serology', 'VSA', 'Other'];
+    'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MalarAI', 'MARSHAL', 'Modeling', 'PDMC',
+    'PharCide', 'PK/PD', 'PLATFORM', 'Review', 'Serology', 'VSA', 'Other'];
 
   // ---------- defensive storage ----------
   function load(key, fb) { try { var v = localStorage.getItem(key); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
@@ -104,6 +104,20 @@
     var s = state[a.id];
     return (s && s.projects) ? s.projects : [];      // manual tags only (no auto-labeling)
   }
+  function effNote(a) { var s = state[a.id]; return (s && s.note) || ''; }
+  // one-time, idempotent: rename legacy tag strings in saved triage
+  var TAG_RENAMES = { 'Computer Vision': 'CV' };
+  function migrateTags() {
+    var changed = false;
+    for (var pmid in state) {
+      var ps = state[pmid] && state[pmid].projects;
+      if (!ps) continue;
+      for (var i = 0; i < ps.length; i++) {
+        if (TAG_RENAMES[ps[i]]) { ps[i] = TAG_RENAMES[ps[i]]; state[pmid].t = Date.now(); changed = true; }
+      }
+    }
+    return changed;
+  }
   function matchesProject(a) {
     if (!prefs.project) return true;
     return effProjects(a).indexOf(prefs.project) >= 0;
@@ -173,6 +187,20 @@
       if (willOpen) { peek.hidden = false; renderProjEditor(node, a); }
     });
     box.appendChild(edit);
+
+    var notes = document.createElement('button');
+    var hasNote = !!effNote(a);
+    notes.className = 'proj-chip note-chip' + (hasNote ? ' has-note' : '');
+    notes.type = 'button';
+    notes.textContent = hasNote ? '✎ Notes' : '＋ Notes';
+    notes.setAttribute('aria-label', 'Edit notes');
+    notes.addEventListener('click', function () {
+      var peek = node.querySelector('.note-peek');
+      var willOpen = peek.hidden;
+      closePeeks(node);
+      if (willOpen) { peek.hidden = false; node.querySelector('.note-text').focus(); }
+    });
+    box.appendChild(notes);
   }
   function renderProjEditor(node, a) {
     var box = node.querySelector('.proj-editor-chips');
@@ -242,7 +270,7 @@
   function exportCSV() {
     var items = savedItems();
     if (!items.length) { alert('No saved articles yet — swipe a card right (★) to save it, then export.'); return; }
-    var cols = ['labels', 'author', 'year', 'title', 'journal', 'summary', 'stars', 'link'];
+    var cols = ['labels', 'author', 'year', 'title', 'journal', 'summary', 'stars', 'notes', 'link'];
     var rows = [cols.join(',')];
     for (var i = 0; i < items.length; i++) {
       var a = items[i];
@@ -255,6 +283,7 @@
         a.journal || '',
         a.details || '',
         getStars(a.id) || '',
+        effNote(a),
         a.url || ('https://pubmed.ncbi.nlm.nih.gov/' + a.id + '/')
       ].map(csvCell).join(','));
     }
@@ -325,6 +354,17 @@
     node.querySelector('.authors-btn').addEventListener('click', function (e) { togglePeek(node, '.authors-peek', e.currentTarget); });
     titleBtn.addEventListener('click', function (e) { togglePeek(node, '.title-peek', e.currentTarget); });
     abBtn.addEventListener('click', function () { toggleAbstract(node, a); });
+    var noteBox = node.querySelector('.note-text');
+    noteBox.value = effNote(a);
+    var noteTimer;
+    noteBox.addEventListener('input', function () {
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(function () {
+        var e = stEntry(a.id); e.note = noteBox.value; e.t = Date.now();
+        persistState();
+        renderProjChips(node, a);   // refresh the Notes chip indicator
+      }, 500);
+    });
     addSwipe(node, a);
     return node;
   }
@@ -348,7 +388,8 @@
     node.addEventListener('pointerdown', function (e) {
       if (e.button != null && e.button !== 0) return;
       if (e.target.closest('.card-actions') || e.target.closest('.proj-chips') ||
-          e.target.closest('.proj-editor') || e.target.closest('a')) return;
+          e.target.closest('.proj-editor') || e.target.closest('.note-peek') ||
+          e.target.closest('a, button, textarea, input')) return;
       startX = e.clientX; startY = e.clientY; dx = 0; active = true; decided = false; horiz = false;
       node.style.transition = 'none';
     });
@@ -657,7 +698,9 @@
     syncing = true; setSyncStatus('Syncing…', 'busy');
     ensureBranch().then(ghGet).then(function (res) {
       remoteSha = res.sha;
-      if (mergeItems(res.items)) { save(LS.state, state); updateCounts(); renderProjectBar(); applyView(); }
+      var merged = mergeItems(res.items);
+      var migrated = migrateTags();   // also fix any legacy tags pulled from remote
+      if (merged || migrated) { save(LS.state, state); updateCounts(); renderProjectBar(); applyView(); }
       return ghPut(remoteSha).then(function (ns) {
         if (ns === null) { // conflict: re-pull, merge, retry once
           return ghGet().then(function (r2) { mergeItems(r2.items); save(LS.state, state); return ghPut(r2.sha); });
@@ -683,6 +726,7 @@
       return r.json();
     }).then(function (d) {
       currentGenerated = d.generated_at || '';
+      if (migrateTags()) save(LS.state, state);
       ingest(d, false);
       setTimeout(checkForUpdates, 1500);
       if (syncEnabled()) syncNow();
