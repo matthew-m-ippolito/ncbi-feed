@@ -201,6 +201,28 @@ body {
 .sm-star { background: none; border: none; font-size: 2.3rem; line-height: 1; color: var(--surface-2); padding: 2px 4px; transition: color .08s; }
 .sm-star.on { color: var(--important-accent); }
 .sm-cancel { margin-top: 14px; background: none; border: none; color: var(--muted); font-size: .9rem; font-weight: 600; }
+
+/* settings / sync sheet */
+.settings-sheet { max-width: 360px; text-align: left; }
+.set-help { margin: 0 0 12px; font-size: .8rem; line-height: 1.4; color: var(--muted); }
+.set-label { display: block; font-size: .74rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+.set-input {
+  width: 100%; font-size: 16px; padding: 9px 11px;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-2); color: var(--text); appearance: none;
+}
+.set-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.set-btn {
+  flex: 1; min-height: 38px; font-size: .82rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface-2); color: var(--text);
+}
+.set-btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.set-hr { border: none; border-top: 1px solid var(--border); margin: 16px 0 12px; }
+.sync-status { margin: 12px 0 0; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.sync-status.ok { color: var(--accent); }
+.sync-status.busy { color: var(--star); }
+.sync-status.err { color: var(--hi-journal); }
 .authors-text { margin: 0; font-size: .88rem; line-height: 1.45; color: var(--muted); }
 
 .card-main { display: block; text-decoration: none; color: inherit; }

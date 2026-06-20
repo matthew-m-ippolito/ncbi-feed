@@ -4,9 +4,10 @@
   var ARTICLES_URL = 'articles.json';
   var ABSTRACTS_URL = 'abstracts.json';
   var LS = {
-    state: 'ncbifeed.v1.state', // { pmid: {read:1, starred:1, readAt:ts} }
+    state: 'ncbifeed.v1.state', // { pmid: {archived?,important?,stars?,projects?, t} }
     prefs: 'ncbifeed.v1.prefs', // { view, sort }
-    meta:  'ncbifeed.v1.meta'   // { seenIds:[...] }
+    meta:  'ncbifeed.v1.meta',  // { seenIds:[...] }
+    sync:  'ncbifeed.v1.sync'   // { token }  (device-local; GitHub triage backup)
   };
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
@@ -52,7 +53,7 @@
   function isArchived(p) { return !!(state[p] && state[p].archived); }
   function isImportant(p) { return !!(state[p] && state[p].important); }
   function getStars(p) { return (state[p] && state[p].stars) || 0; }
-  function persistState() { save(LS.state, state); }
+  function persistState() { save(LS.state, state); scheduleSync(); }
 
   function parseDate(s) {
     if (!s) return null;
@@ -118,7 +119,7 @@
     var cur = effProjects(a).slice();
     var i = cur.indexOf(label);
     if (i >= 0) cur.splice(i, 1); else cur.push(label);
-    stEntry(a.id).projects = cur;
+    var e = stEntry(a.id); e.projects = cur; e.t = Date.now();
     persistState();
     renderProjChips(node, a);
     renderProjEditor(node, a);
@@ -398,12 +399,12 @@
   // ---------- triage: archive / important (+stars) ----------
   function archive(a) {
     var e = stEntry(a.id);
-    e.archived = 1; delete e.important; delete e.stars;
+    e.archived = 1; delete e.important; delete e.stars; e.t = Date.now();
     persistState();
   }
   function setImportant(a, stars) {
     var e = stEntry(a.id);
-    e.important = 1; e.stars = stars; delete e.archived;
+    e.important = 1; e.stars = stars; delete e.archived; e.t = Date.now();
     persistState();
   }
   function applyTriage(node, a, kind, stars) {
@@ -592,6 +593,89 @@
   paintSortBtn();
   tabs.forEach(function (t) { t.setAttribute('aria-selected', t.dataset.view === prefs.view ? 'true' : 'false'); });
 
+  // ---------- GitHub triage backup/sync (single user) ----------
+  var GH_OWNER = 'matthew-m-ippolito', GH_REPO = 'ncbi-feed', GH_BRANCH = 'triage-state', GH_PATH = 'triage.json';
+  var GH_API = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO;
+  var sync = load(LS.sync, {});
+  var remoteSha = null, syncing = false, pushTimer = null;
+
+  function syncEnabled() { return !!(sync && sync.token); }
+  function ghHeaders() { return { 'Authorization': 'Bearer ' + sync.token, 'Accept': 'application/vnd.github+json' }; }
+  function b64enc(s) { return btoa(unescape(encodeURIComponent(s))); }
+  function b64dec(s) { return decodeURIComponent(escape(atob((s || '').replace(/\n/g, '')))); }
+
+  function setSyncStatus(txt, kind) {
+    var el = document.getElementById('sync-status');
+    if (el) { el.textContent = txt; el.className = 'sync-status ' + (kind || ''); }
+  }
+
+  function ghGet() { // -> {items, sha}
+    return fetch(GH_API + '/contents/' + GH_PATH + '?ref=' + GH_BRANCH, { headers: ghHeaders(), cache: 'no-store' })
+      .then(function (r) {
+        if (r.status === 404) return { items: {}, sha: null };
+        if (!r.ok) throw new Error('GET ' + r.status);
+        return r.json().then(function (j) {
+          var data = {}; try { data = JSON.parse(b64dec(j.content)); } catch (e) {}
+          return { items: (data && data.items) || {}, sha: j.sha };
+        });
+      });
+  }
+  function ensureBranch() {
+    return fetch(GH_API + '/git/ref/heads/' + GH_BRANCH, { headers: ghHeaders() }).then(function (r) {
+      if (r.ok) return true;
+      if (r.status !== 404) throw new Error('ref ' + r.status);
+      return fetch(GH_API + '/git/ref/heads/main', { headers: ghHeaders() })
+        .then(function (r2) { if (!r2.ok) throw new Error('main ' + r2.status); return r2.json(); })
+        .then(function (m) {
+          return fetch(GH_API + '/git/refs', { method: 'POST', headers: ghHeaders(),
+            body: JSON.stringify({ ref: 'refs/heads/' + GH_BRANCH, sha: m.object.sha }) });
+        }).then(function () { return true; });
+    });
+  }
+  function ghPut(sha) {
+    var payload = { v: 1, updatedAt: Date.now(), items: state };
+    var body = { message: 'triage ' + new Date().toISOString(),
+      content: b64enc(JSON.stringify(payload)), branch: GH_BRANCH };
+    if (sha) body.sha = sha;
+    return fetch(GH_API + '/contents/' + GH_PATH, { method: 'PUT', headers: ghHeaders(), body: JSON.stringify(body) })
+      .then(function (r) {
+        if (r.status === 409 || r.status === 422) return null; // sha conflict -> retry
+        if (!r.ok) throw new Error('PUT ' + r.status);
+        return r.json().then(function (j) { return j.content.sha; });
+      });
+  }
+  function mergeItems(remote) { // per-pmid last-writer-wins by t
+    var changed = false;
+    for (var pmid in remote) {
+      var rt = remote[pmid] || {}, lt = state[pmid];
+      if (!lt || (rt.t || 0) > (lt.t || 0)) { state[pmid] = rt; changed = true; }
+    }
+    return changed;
+  }
+  function syncNow() {
+    if (!syncEnabled() || syncing) return;
+    syncing = true; setSyncStatus('Syncing…', 'busy');
+    ensureBranch().then(ghGet).then(function (res) {
+      remoteSha = res.sha;
+      if (mergeItems(res.items)) { save(LS.state, state); updateCounts(); renderProjectBar(); applyView(); }
+      return ghPut(remoteSha).then(function (ns) {
+        if (ns === null) { // conflict: re-pull, merge, retry once
+          return ghGet().then(function (r2) { mergeItems(r2.items); save(LS.state, state); return ghPut(r2.sha); });
+        }
+        return ns;
+      }).then(function (ns) { if (ns) remoteSha = ns; });
+    }).then(function () {
+      syncing = false; setSyncStatus('Synced ✓', 'ok');
+    }).catch(function () {
+      syncing = false; setSyncStatus(navigator.onLine === false ? 'Offline — will retry' : 'Error — check token', 'err');
+    });
+  }
+  function scheduleSync() {
+    if (!syncEnabled()) return;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(syncNow, 2500);
+  }
+
   // ---------- boot ----------
   function boot() {
     fetch(ARTICLES_URL).then(function (r) {
@@ -601,10 +685,59 @@
       currentGenerated = d.generated_at || '';
       ingest(d, false);
       setTimeout(checkForUpdates, 1500);
+      if (syncEnabled()) syncNow();
     }).catch(function (err) {
       loadingEl.hidden = true;
       if (allArticles.length === 0) { errorEl.hidden = false; }
     });
+  }
+
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && syncEnabled()) syncNow(); });
+
+  // ---------- settings sheet (sync token + JSON backup) ----------
+  var settingsModal = document.getElementById('settings-modal');
+  var tokenInput = document.getElementById('sync-token');
+  function openSettings() {
+    if (tokenInput) tokenInput.value = (sync && sync.token) ? sync.token : '';
+    setSyncStatus(syncEnabled() ? 'Connected' : 'Not set up', syncEnabled() ? 'ok' : '');
+    settingsModal.hidden = false;
+  }
+  function closeSettings() { settingsModal.hidden = true; }
+  function exportJSON() {
+    var blob = new Blob([JSON.stringify({ v: 1, exportedAt: Date.now(), items: state }, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob), el = document.createElement('a');
+    el.href = url; el.download = 'malaria-feed-triage-backup.json';
+    document.body.appendChild(el); el.click();
+    setTimeout(function () { document.body.removeChild(el); URL.revokeObjectURL(url); }, 200);
+  }
+  function importJSON(file) {
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var d = JSON.parse(rd.result), items = d.items || d;
+        if (mergeItems(items)) { save(LS.state, state); updateCounts(); renderProjectBar(); applyView(); }
+        setSyncStatus('Imported ✓', 'ok'); scheduleSync();
+      } catch (e) { setSyncStatus('Import failed — bad file', 'err'); }
+    };
+    rd.readAsText(file);
+  }
+  if (settingsModal) {
+    document.getElementById('settings-btn').addEventListener('click', openSettings);
+    document.getElementById('set-close').addEventListener('click', closeSettings);
+    settingsModal.addEventListener('click', function (e) { if (e.target === settingsModal) closeSettings(); });
+    document.getElementById('sync-save').addEventListener('click', function () {
+      var t = tokenInput.value.trim();
+      sync = t ? { token: t } : {};
+      save(LS.sync, sync);
+      if (syncEnabled()) { setSyncStatus('Connecting…', 'busy'); syncNow(); } else { setSyncStatus('Not set up', ''); }
+    });
+    document.getElementById('sync-disconnect').addEventListener('click', function () {
+      sync = {}; save(LS.sync, sync); if (tokenInput) tokenInput.value = ''; setSyncStatus('Disconnected', '');
+    });
+    document.getElementById('export-json').addEventListener('click', exportJSON);
+    var imp = document.getElementById('import-json');
+    document.getElementById('import-json-btn').addEventListener('click', function () { imp.click(); });
+    imp.addEventListener('change', function () { if (imp.files[0]) importJSON(imp.files[0]); });
   }
 
   if ('serviceWorker' in navigator) {
