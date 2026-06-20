@@ -451,6 +451,9 @@
     persistState();
   }
   function applyTriage(node, a, kind, stars) {
+    // snapshot the entry BEFORE archiving so Undo can restore it exactly (untriaged, or any tags/note)
+    var prevSnap = kind === 'archive'
+      ? (state[a.id] ? JSON.parse(JSON.stringify(state[a.id])) : null) : null;
     if (kind === 'archive') archive(a); else setImportant(a, stars);
     updateCounts();
     if (matchesView(a)) {                 // stays in current view
@@ -463,6 +466,7 @@
       node.style.opacity = '0';
       setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); showEmptyState(); }, 230);
     }
+    if (kind === 'archive') showUndo(a, prevSnap);
   }
   function removeCard(node) {
     node.style.transition = 'opacity .18s ease, transform .18s ease';
@@ -470,6 +474,37 @@
     node.style.transform = 'translateX(8px)';
     setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); showEmptyState(); }, 180);
   }
+
+  // ---------- undo (accidental archive) ----------
+  var undoToast = document.getElementById('undo-toast');
+  var undoMsgEl = undoToast.querySelector('.undo-msg');
+  var undoBtnEl = document.getElementById('undo-btn');
+  var undoCtx = null, undoTimer = null;
+  function showUndo(a, prevSnap) {
+    undoCtx = { id: a.id, prev: prevSnap };
+    undoMsgEl.textContent = 'Archived';
+    undoToast.hidden = false;
+    void undoToast.offsetWidth;                 // force reflow so the slide-in transition runs
+    undoToast.classList.add('show');
+    clearTimeout(undoTimer);
+    undoTimer = setTimeout(hideUndo, 5000);
+  }
+  function hideUndo() {
+    clearTimeout(undoTimer);
+    undoCtx = null;
+    undoToast.classList.remove('show');
+    setTimeout(function () { if (!undoToast.classList.contains('show')) undoToast.hidden = true; }, 220);
+  }
+  undoBtnEl.addEventListener('click', function () {
+    if (!undoCtx) return;
+    if (undoCtx.prev == null) delete state[undoCtx.id];   // was untriaged -> remove entry entirely
+    else state[undoCtx.id] = undoCtx.prev;                // restore prior entry (tags/note/etc.)
+    persistState();
+    updateCounts();
+    renderProjectBar();
+    applyView();                                          // re-renders the card back into place
+    hideUndo();
+  });
 
   // ---------- peeks (only one open per card) ----------
   function closePeeks(node) {

@@ -150,6 +150,37 @@ body {
   font-size: .76rem; font-weight: 600;
 }
 
+/* ---------- Undo toast (snackbar) ---------- */
+.undo-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom) + 14px);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 28px);
+  padding: 9px 8px 9px 16px;
+  border-radius: 11px;
+  background: #1d2a29;
+  border: 1px solid rgba(255, 255, 255, .14);
+  box-shadow: 0 6px 22px rgba(0, 0, 0, .32);
+  opacity: 0;
+  transform: translate(-50%, 18px);
+  pointer-events: none;
+  transition: opacity .2s ease, transform .2s ease;
+}
+.undo-toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.undo-msg { color: #eef3f2; font-size: .9rem; font-weight: 500; }
+.undo-btn {
+  appearance: none; -webkit-appearance: none;
+  border: none; background: transparent;
+  color: var(--star); font-size: .9rem; font-weight: 800;
+  letter-spacing: .03em; text-transform: uppercase;
+  padding: 6px 12px; min-height: 36px; cursor: pointer;
+}
+.undo-btn:active { opacity: .55; }
+
 /* ---------- Feed ---------- */
 .feed {
   max-width: var(--maxw);
