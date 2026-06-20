@@ -387,9 +387,11 @@
     var startX = 0, startY = 0, dx = 0, active = false, decided = false, horiz = false;
     node.addEventListener('pointerdown', function (e) {
       if (e.button != null && e.button !== 0) return;
+      // swipe is allowed over the Notes area/textarea too: a tap still focuses it for typing,
+      // a horizontal drag swipes the card. Only true tap targets (buttons/links/chips) opt out.
       if (e.target.closest('.card-actions') || e.target.closest('.proj-chips') ||
-          e.target.closest('.proj-editor') || e.target.closest('.note-peek') ||
-          e.target.closest('a, button, textarea, input')) return;
+          e.target.closest('.proj-editor') ||
+          e.target.closest('a, button')) return;
       startX = e.clientX; startY = e.clientY; dx = 0; active = true; decided = false; horiz = false;
       node.style.transition = 'none';
     });
