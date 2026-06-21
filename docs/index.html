@@ -25,8 +25,7 @@
     <h1 class="app-title">Malaria Feed</h1>
     <div class="header-right">
       <span id="updated" class="updated" aria-live="polite"></span>
-      <button id="export-btn" class="export-btn" type="button">Export</button>
-      <button id="settings-btn" class="export-btn" type="button" aria-label="Sync settings">⚙</button>
+      <button id="settings-btn" class="export-btn" type="button" aria-label="Menu">⚙</button>
     </div>
   </div>
   <div class="search-wrap">
@@ -68,26 +67,47 @@
 </nav>
 
 <div id="settings-modal" class="star-modal" hidden>
-  <div class="sm-sheet settings-sheet" role="dialog" aria-label="Sync settings" aria-modal="true">
-    <p class="sm-title">Backup &amp; Sync</p>
-    <p class="set-help">Backs up your triage (archive / important / stars / tags) to your private
-      GitHub so it survives cache-clears and syncs across devices.</p>
-    <label class="set-label" for="sync-token">GitHub token (fine-grained, repo <b>ncbi-feed</b>, Contents: read &amp; write)</label>
-    <input id="sync-token" class="set-input" type="password" autocomplete="off" autocorrect="off"
-           autocapitalize="none" spellcheck="false" placeholder="github_pat_…">
-    <div class="set-row">
-      <button id="sync-save" class="set-btn primary" type="button">Save &amp; sync</button>
-      <button id="sync-disconnect" class="set-btn" type="button">Disconnect</button>
+  <div class="sm-sheet settings-sheet" role="dialog" aria-label="Menu" aria-modal="true">
+
+    <div id="set-menu" class="set-view">
+      <p class="sm-title">Menu</p>
+      <button id="menu-export-csv" class="menu-item" type="button">
+        <span class="menu-item-main">Export</span>
+        <span class="menu-item-sub">Saved ★ articles → CSV spreadsheet</span>
+      </button>
+      <button id="menu-export-zotero" class="menu-item" type="button">
+        <span class="menu-item-main">Export to Zotero</span>
+        <span class="menu-item-sub">Saved ★ articles → Zotero library (.ris), tags kept</span>
+      </button>
+      <button id="menu-sync" class="menu-item" type="button">
+        <span class="menu-item-main">Backup &amp; Sync</span>
+        <span class="menu-item-sub">GitHub backup of your triage across devices</span>
+      </button>
+      <button id="set-close" class="sm-cancel" type="button">Close</button>
     </div>
-    <p id="sync-status" class="sync-status">Not set up</p>
-    <hr class="set-hr">
-    <p class="set-help">Manual backup file (extra insurance):</p>
-    <div class="set-row">
-      <button id="export-json" class="set-btn" type="button">Export JSON</button>
-      <button id="import-json-btn" class="set-btn" type="button">Import JSON</button>
-      <input id="import-json" type="file" accept="application/json,.json" hidden>
+
+    <div id="set-sync" class="set-view" hidden>
+      <p class="sm-title">Backup &amp; Sync</p>
+      <p class="set-help">Backs up your triage (archive / important / stars / tags) to your private
+        GitHub so it survives cache-clears and syncs across devices.</p>
+      <label class="set-label" for="sync-token">GitHub token (fine-grained, repo <b>ncbi-feed</b>, Contents: read &amp; write)</label>
+      <input id="sync-token" class="set-input" type="password" autocomplete="off" autocorrect="off"
+             autocapitalize="none" spellcheck="false" placeholder="github_pat_…">
+      <div class="set-row">
+        <button id="sync-save" class="set-btn primary" type="button">Save &amp; sync</button>
+        <button id="sync-disconnect" class="set-btn" type="button">Disconnect</button>
+      </div>
+      <p id="sync-status" class="sync-status">Not set up</p>
+      <hr class="set-hr">
+      <p class="set-help">Manual backup file (extra insurance):</p>
+      <div class="set-row">
+        <button id="export-json" class="set-btn" type="button">Export JSON</button>
+        <button id="import-json-btn" class="set-btn" type="button">Import JSON</button>
+        <input id="import-json" type="file" accept="application/json,.json" hidden>
+      </div>
+      <button id="sync-back" class="sm-cancel" type="button">← Back</button>
     </div>
-    <button id="set-close" class="sm-cancel" type="button">Close</button>
+
   </div>
 </div>
 

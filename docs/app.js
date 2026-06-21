@@ -46,7 +46,6 @@
   var tpl = document.getElementById('card-tpl');
   var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
   var starModal = document.getElementById('star-modal');
-  var exportBtn = document.getElementById('export-btn');
 
   // ---------- helpers ----------
   function stEntry(pmid) { return state[pmid] || (state[pmid] = {}); }
@@ -227,7 +226,6 @@
     setCount('inbox', inbox);
     setCount('important', important);
     setCount('archive', archive);
-    if (exportBtn) exportBtn.textContent = important > 0 ? ('Export ★' + important) : 'Export';
   }
   function setCount(view, n) {
     var el = document.querySelector('.tab-count[data-count="' + view + '"]');
@@ -289,19 +287,71 @@
     }
     var fname = 'malaria-feed-saved-' + items.length + '.csv';
     var blob = new Blob(['﻿' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
-    try {                                   // iOS: native share sheet (Save to Files, email, AirDrop)
-      var file = new File([blob], fname, { type: 'text/csv' });
+    shareOrDownload(blob, fname, 'text/csv');
+  }
+
+  // iOS: native share sheet (Save to Files, open in Zotero, email); desktop: direct download
+  function shareOrDownload(blob, fname, mime) {
+    function download() {
+      var url = URL.createObjectURL(blob);
+      var aEl = document.createElement('a');
+      aEl.href = url; aEl.download = fname;
+      document.body.appendChild(aEl);
+      aEl.click();
+      setTimeout(function () { document.body.removeChild(aEl); URL.revokeObjectURL(url); }, 200);
+    }
+    try {
+      var file = new File([blob], fname, { type: mime });
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        navigator.share({ files: [file], title: 'Malaria Feed export' }).catch(function () {});
+        navigator.share({ files: [file], title: 'Malaria Feed export' }).catch(function (err) {
+          if (err && err.name === 'AbortError') return;   // user dismissed the sheet on purpose
+          download();                                      // gesture expired / not permitted -> still deliver the file
+        });
         return;
       }
     } catch (e) {}
-    var url = URL.createObjectURL(blob);    // desktop fallback: direct download
-    var aEl = document.createElement('a');
-    aEl.href = url; aEl.download = fname;
-    document.body.appendChild(aEl);
-    aEl.click();
-    setTimeout(function () { document.body.removeChild(aEl); URL.revokeObjectURL(url); }, 200);
+    download();
+  }
+
+  // ---------- Zotero export (.ris): saved ★ items; each tag becomes a Zotero tag (KW) ----------
+  function risLine(tag, val) {  // RIS is line-based; flatten newlines so a value stays one logical line
+    return tag + '  - ' + String(val == null ? '' : val).replace(/\r?\n+/g, ' ').trim();
+  }
+  function exportZotero() {
+    var items = savedItems();
+    if (!items.length) { alert('No saved articles yet — swipe a card right (★) to save it, then export.'); return; }
+    loadAbstracts().then(function (abMap) {
+      var L = [];
+      for (var i = 0; i < items.length; i++) {
+        var a = items[i], d = parseDate(a.date);
+        L.push('TY  - JOUR');
+        L.push(risLine('TI', a.title_original || a.headline || '(untitled)'));
+        var au = (a.authors || '').split(',');                       // "Smith J, Okello A" -> one AU each
+        for (var j = 0; j < au.length; j++) { var nm = au[j].trim(); if (nm) L.push(risLine('AU', nm)); }
+        if (a.journal) L.push(risLine('JO', a.journal));
+        // year only: the pipeline pads partial PubMed dates to the 1st, so a full DA would invent a
+        // day. PY is always accurate — never fabricate month/day precision we don't actually have.
+        if (d) L.push(risLine('PY', d.getFullYear()));
+        var ab = abMap && abMap[a.id];
+        if (ab) L.push(risLine('AB', ab));                            // real abstract -> searchable in Zotero
+        var tags = effProjects(a);
+        for (var k = 0; k < tags.length; k++) L.push(risLine('KW', tags[k]));   // multiple tags fully supported
+        if (a.doi) L.push(risLine('DO', a.doi));                      // DOI when present -> Zotero Find PDF
+        if (a.url) L.push(risLine('UR', a.url));                      // PubMed link (-> Find Available PDF)
+        L.push(risLine('AN', a.pmid || a.id));                        // PubMed ID
+        L.push('DB  - PubMed');
+        var note = [];
+        if (a.headline) note.push('Headline: ' + a.headline);
+        if (a.details) note.push('Plain-language summary: ' + a.details);
+        var st = getStars(a.id); if (st) note.push('Rating: ' + '★★★★★'.slice(0, st) + ' (' + st + '/5)');
+        var un = effNote(a); if (un) note.push('My notes: ' + un);
+        if (note.length) L.push(risLine('N1', note.join('  |  ')));   // our summary + notes -> Zotero note
+        L.push('ER  - ');
+        L.push('');
+      }
+      var blob = new Blob([L.join('\r\n')], { type: 'application/x-research-info-systems;charset=utf-8;' });
+      shareOrDownload(blob, 'malaria-feed-zotero-' + items.length + '.ris', 'application/x-research-info-systems');
+    });
   }
   function showEmptyState() {
     var none = visible.length === 0;
@@ -622,7 +672,6 @@
     save(LS.prefs, prefs);
     applyView();
   });
-  if (exportBtn) exportBtn.addEventListener('click', exportCSV);
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () {
       prefs.view = tab.dataset.view;
@@ -778,9 +827,21 @@
   // ---------- settings sheet (sync token + JSON backup) ----------
   var settingsModal = document.getElementById('settings-modal');
   var tokenInput = document.getElementById('sync-token');
+  function setView(which) {
+    document.getElementById('set-menu').hidden = (which !== 'menu');
+    document.getElementById('set-sync').hidden = (which !== 'sync');
+    var sheet = settingsModal.querySelector('.sm-sheet');
+    if (sheet) sheet.setAttribute('aria-label', which === 'sync' ? 'Backup & Sync' : 'Menu');
+  }
   function openSettings() {
     if (tokenInput) tokenInput.value = (sync && sync.token) ? sync.token : '';
     setSyncStatus(syncEnabled() ? 'Connected' : 'Not set up', syncEnabled() ? 'ok' : '');
+    var n = savedItems().length;
+    var cap = n ? (n + ' saved ★ article' + (n === 1 ? '' : 's')) : 'No saved articles yet';
+    document.querySelector('#menu-export-csv .menu-item-sub').textContent = cap + ' → CSV spreadsheet';
+    document.querySelector('#menu-export-zotero .menu-item-sub').textContent = cap + ' → Zotero library (.ris), tags kept';
+    if (n) loadAbstracts();           // warm the abstract cache so a Zotero export can use the iOS share sheet
+    setView('menu');
     settingsModal.hidden = false;
   }
   function closeSettings() { settingsModal.hidden = true; }
@@ -806,6 +867,10 @@
     document.getElementById('settings-btn').addEventListener('click', openSettings);
     document.getElementById('set-close').addEventListener('click', closeSettings);
     settingsModal.addEventListener('click', function (e) { if (e.target === settingsModal) closeSettings(); });
+    document.getElementById('menu-export-csv').addEventListener('click', function () { closeSettings(); exportCSV(); });
+    document.getElementById('menu-export-zotero').addEventListener('click', function () { closeSettings(); exportZotero(); });
+    document.getElementById('menu-sync').addEventListener('click', function () { setView('sync'); });
+    document.getElementById('sync-back').addEventListener('click', function () { setView('menu'); });
     document.getElementById('sync-save').addEventListener('click', function () {
       var t = tokenInput.value.trim();
       sync = t ? { token: t } : {};

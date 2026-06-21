@@ -230,10 +230,21 @@ body {
 .sm-stars { display: flex; justify-content: center; gap: 4px; }
 .sm-star { background: none; border: none; font-size: 2.3rem; line-height: 1; color: var(--surface-2); padding: 2px 4px; transition: color .08s; }
 .sm-star.on { color: var(--important-accent); }
-.sm-cancel { margin-top: 14px; background: none; border: none; color: var(--muted); font-size: .9rem; font-weight: 600; }
+.sm-cancel { margin-top: 14px; min-height: 44px; padding: 8px 16px; background: none; border: none; color: var(--muted); font-size: .9rem; font-weight: 600; }
 
 /* settings / sync sheet */
 .settings-sheet { max-width: 360px; text-align: left; }
+.set-view { display: flex; flex-direction: column; }
+.menu-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  width: 100%; text-align: left;
+  padding: 12px 14px; margin: 0 0 8px;
+  border: 1px solid var(--border); border-radius: 11px;
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+}
+.menu-item:active { background: var(--accent-weak); }
+.menu-item-main { font-size: 1rem; font-weight: 700; }
+.menu-item-sub { font-size: .75rem; font-weight: 400; color: var(--muted); }
 .set-help { margin: 0 0 12px; font-size: .8rem; line-height: 1.4; color: var(--muted); }
 .set-label { display: block; font-size: .74rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
 .set-input {
