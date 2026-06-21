@@ -12,7 +12,7 @@
   var PAGE = 30;
   // your research projects, alphabetical (used for the manual tag editor)
   var PROJECTS = ['CHASM', 'CV', 'Drug Resistance', 'Drugs', 'Forecasting',
-    'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MalarAI', 'MARSHAL', 'Modeling', 'PDMC',
+    'Genomics', 'ICEMR', 'IMPRINT', 'MACEPA', 'MalarAI', 'MARSHAL', 'Modeling', 'Mol Bio', 'PDMC',
     'PharCide', 'PK/PD', 'PLATFORM', 'Review', 'Serology', 'Vaccine', 'VSA', 'Other'];
 
   // ---------- defensive storage ----------
