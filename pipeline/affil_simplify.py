@@ -41,7 +41,18 @@ _COUNTRIES.update({
     "brasil", "españa", "espana", "deutschland", "italia", "suisse", "schweiz", "svizzera",
     "österreich", "osterreich", "belgique", "belgië", "belgie", "nederland", "danmark", "sverige",
     "norge", "suomi", "polska", "méxico", "perú", "panamá", "república dominicana", "magyarország",
+    "moçambique", "são tomé e príncipe", "côte d'ivoire", "türkiye", "turkiye", "brasil",
 })
+# native spellings normalized to an English display form (keeps country labels consistent)
+_NATIVE2EN = {
+    "brasil": "Brazil", "españa": "Spain", "espana": "Spain", "deutschland": "Germany",
+    "italia": "Italy", "suisse": "Switzerland", "schweiz": "Switzerland", "svizzera": "Switzerland",
+    "österreich": "Austria", "osterreich": "Austria", "belgique": "Belgium", "belgië": "Belgium",
+    "belgie": "Belgium", "nederland": "Netherlands", "danmark": "Denmark", "sverige": "Sweden",
+    "norge": "Norway", "suomi": "Finland", "polska": "Poland", "méxico": "Mexico", "perú": "Peru",
+    "panamá": "Panama", "magyarország": "Hungary", "moçambique": "Mozambique", "türkiye": "Turkey",
+    "turkiye": "Turkey",
+}
 
 _US = {"usa", "u.s.a.", "u.s.a", "united states", "united states of america", "us", "u.s.", "america"}
 _UK = {"uk", "u.k.", "u.k", "united kingdom", "england", "scotland", "wales",
@@ -51,13 +62,44 @@ _STRONG = re.compile(
     r"(universit|universidad|université|universität|università|universidade|institut|instituto|"
     r"hospital|hôpital|college|polytechnic|hochschule|academ|minist|foundation|fondation|fundac|"
     r"fundaç|council|pasteur|wellcome|max planck|clinic|klinik|kemri|icddr|noguchi|escuela|escola|"
+    r"\bchu\b|\bchru\b|\bchum\b|\bnih\b|\bicmr\b|"
     r"\binc\b|\bltd\b|\bllc\b|gmbh|\bab\b|corporation|\bpty\b|pharmaceutic|therapeutic|biotech|venture)", re.I)
 _WEAK = re.compile(
     r"(school|centre|center|centro|zentrum|facult|laborator|laboratoire|program|initiative|network|"
-    r"consortium|agency|agence|\bcdc\b|\bwho\b|usaid|inserm|cnrs|\bird\b|trust|hopital)", re.I)
+    r"consortium|agency|agence|authorit|\bcdc\b|\bwho\b|usaid|inserm|cnrs|\bird\b|trust|hopital|"
+    r"research[\s-]+(?:institut|cent|unit|programm|council|collaborat|network|station|foundation|organi|group))", re.I)
 # anchored to the START: only drop a part that LEADS with a sub-unit word (academic "Department of
 # X", "Faculty of Y"). A trailing such word (e.g. "Sabah State Health Department", "Juntendo
 # University Faculty of Medicine") is kept — it's usually the institution itself, not a sub-unit.
+_STOP = {"and", "the", "et al", "et al.", "&"}
+
+# a comma-part that is JUST a company suffix ("Inc.", "Ltd.") belongs to the previous part
+_SUFFIX = re.compile(
+    r"^(inc|ltd|llc|gmbh|co|ab|pvt\.?\s*ltd|pvt|s\.?a|s\.?l|pty\.?\s*ltd|pty|b\.?v|corp|plc|srl|spa)\.?$", re.I)
+# a comma-part ENDING in a connector word (or hyphen) is a truncation artifact — rejoin the next part
+_CONNECTOR = re.compile(
+    r"(\b(?:de|da|do|dos|das|du|del|della|di|of|e|y|et|and|the|for|at|von|van|der|den|el|la|le|los|al)\b|[-–])\s*$", re.I)
+
+
+def _merge_parts(parts):
+    """Repair comma-splitting artifacts: rejoin bare company suffixes (back) and connector-truncated
+    names (forward), so 'Eisai','Inc.' -> 'Eisai, Inc.' and 'Saude de','Manhica' -> 'Saude de Manhica'."""
+    merged = []
+    for p in parts:
+        if merged and _SUFFIX.match(p.strip()):
+            merged[-1] = merged[-1] + ", " + p.strip()
+        else:
+            merged.append(p)
+    out, i = [], 0
+    while i < len(merged):
+        cur = merged[i]
+        while i + 1 < len(merged) and _CONNECTOR.search(cur):
+            cur = cur + " " + merged[i + 1]
+            i += 1
+        out.append(cur)
+        i += 1
+    return out
+
 _DEPT = re.compile(
     r"^\s*(depart[ae]?ments?|dept|division|divisione|faculty|facult[eé]|service|servicio|servei|"
     r"section|secção|branch|chair|discipline|research group|laboratory|laboratoire|laboratório|"
@@ -71,6 +113,8 @@ def _canon_country(c):
         return "USA"
     if k in _UK:
         return "UK"
+    if k in _NATIVE2EN:
+        return _NATIVE2EN[k]
     return s
 
 
@@ -101,6 +145,7 @@ def simplify_one(sub):
     if not sub or not re.search(r"[A-Za-z]", sub):
         return None
     parts = [p.strip() for p in sub.split(",") if p.strip()]
+    parts = _merge_parts(parts)   # repair company-suffix / connector-truncation comma artifacts
     if not parts:
         return None
     country, ci = None, len(parts)
@@ -120,10 +165,17 @@ def simplify_one(sub):
         for p in nondept:
             if _WEAK.search(p):
                 inst = p      # else rightmost weak-keyword part
+    had_keyword = inst is not None
     if not inst:
         inst = nondept[0]     # else first non-department part
     inst = _clean_inst(inst)
     if not inst or not re.search(r"[A-Za-z]{2}", inst):
+        return None
+    # No institution keyword AND no country -> this is almost always a bare department/specialty or a
+    # PubMed fragment ("Pediatric Neurology", "and") rather than a real institution. Drop it.
+    if not had_keyword and not country:
+        return None
+    if inst.strip().lower() in _STOP:
         return None
     return inst + (", " + country if country else "")
 
