@@ -265,7 +265,7 @@ body {
 .sync-status.busy { color: var(--star); }
 .sync-status.err { color: var(--hi-journal); }
 .authors-text { margin: 0; font-size: .88rem; line-height: 1.45; color: var(--muted); }
-.affil-label { margin-top: 12px; }
+.affil-label { margin-top: 22px; }
 .affil-text { margin: 0; max-height: 42vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 .affil-text.is-loading { font-size: .82rem; color: var(--muted); }
 .affil-item { margin: 0 0 5px; font-size: .8rem; line-height: 1.4; color: var(--muted); overflow-wrap: anywhere; }
