@@ -11,8 +11,9 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, HERE)
-import pubmed   # noqa: E402
-import store     # noqa: E402
+import pubmed          # noqa: E402
+import store           # noqa: E402
+import affil_simplify  # noqa: E402
 
 
 def log(*a):
@@ -41,8 +42,9 @@ for i in range(0, len(pmids), CH):
         log("  batch %d failed (%s); continuing" % (i // CH, ex))
         continue
     for pid, d in full.items():
-        if d.get("affiliations"):
-            store_aff[pid] = d["affiliations"]
+        s = affil_simplify.simplify_list(d.get("affiliations") or [])   # verbose -> "Institution, Country"
+        if s:
+            store_aff[pid] = s
     done += len(chunk)
     store.save_affiliations(aff_path, store_aff)   # checkpoint
     log("  %d/%d processed | %d with affiliations" % (done, len(pmids), len(store_aff)))

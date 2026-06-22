@@ -1,5 +1,5 @@
 /* Bump VERSION whenever you change index.html / app.css / app.js. */
-var VERSION = 'v26';
+var VERSION = 'v27';
 var SHELL = 'shell-' + VERSION;
 var DATA = 'data-' + VERSION;
 var SHELL_FILES = [

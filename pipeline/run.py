@@ -28,6 +28,7 @@ import pubmed
 import headlines
 import store
 import verify
+import affil_simplify
 
 
 def log(*a):
@@ -128,7 +129,11 @@ def main():
     log("efetch abstracts + affiliations ...")
     full = pm.efetch_full(usable)
     abmap = {pid: d["abstract"] for pid, d in full.items() if d.get("abstract")}
-    affmap = {pid: d["affiliations"] for pid, d in full.items() if d.get("affiliations")}
+    affmap = {}
+    for pid, d in full.items():
+        s = affil_simplify.simplify_list(d.get("affiliations") or [])   # verbose -> "Institution, Country"
+        if s:
+            affmap[pid] = s
     log("  abstracts: %d/%d | affiliations: %d/%d" % (len(abmap), len(usable), len(affmap), len(usable)))
 
     items = [{"id": pid, "title": meta[pid]["title"], "abstract": abmap.get(pid, "")}
