@@ -76,6 +76,7 @@ def main():
     p = cfg["paths"]
     art_path = os.path.join(ROOT, p["articles"])
     abs_path = os.path.join(ROOT, p["abstracts"])
+    aff_path = os.path.join(ROOT, p["affiliations"])
     state_path = os.path.join(ROOT, p["state"])
 
     if args.regen_headlines:
@@ -124,9 +125,11 @@ def main():
     if skipped:
         log("  skipped %d ids with no summary/title" % skipped)
 
-    log("efetch abstracts ...")
-    abmap = pm.efetch_abstracts(usable)
-    log("  abstracts found: %d/%d" % (len(abmap), len(usable)))
+    log("efetch abstracts + affiliations ...")
+    full = pm.efetch_full(usable)
+    abmap = {pid: d["abstract"] for pid, d in full.items() if d.get("abstract")}
+    affmap = {pid: d["affiliations"] for pid, d in full.items() if d.get("affiliations")}
+    log("  abstracts: %d/%d | affiliations: %d/%d" % (len(abmap), len(usable), len(affmap), len(usable)))
 
     items = [{"id": pid, "title": meta[pid]["title"], "abstract": abmap.get(pid, "")}
              for pid in usable]
@@ -157,11 +160,14 @@ def main():
 
     abstracts_store = store.load_abstracts(abs_path)
     abstracts_store.update(abmap)
+    affils_store = store.load_affiliations(aff_path)
+    affils_store.update(affmap)
 
     gen = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     n = store.save_articles(art_path, existing, gen, cap=cfg.get("feed_cap", 0))
     store.save_abstracts(abs_path, abstracts_store)
-    log("wrote %d articles, %d abstracts" % (n, len(abstracts_store)))
+    store.save_affiliations(aff_path, affils_store)
+    log("wrote %d articles, %d abstracts, %d affiliations" % (n, len(abstracts_store), len(affils_store)))
 
     stt = store.load_state(state_path)
     stt["last_run"] = gen

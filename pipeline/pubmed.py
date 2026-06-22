@@ -3,6 +3,7 @@
 Reads PubMed directly so the pipeline never needs Gmail. Polite by default
 (rate-limited, tool/email tagged, retries with backoff).
 """
+import re
 import time
 import warnings
 warnings.filterwarnings("ignore")  # silence urllib3 version warning (before requests import)
@@ -97,9 +98,9 @@ class PubMed:
                 }
         return out
 
-    # ---- efetch (abstracts) ----
-    def efetch_abstracts(self, pmids):
-        """pmid -> abstract text (only for articles that have one)."""
+    # ---- efetch (abstracts + author affiliations, one XML pass) ----
+    def efetch_full(self, pmids):
+        """pmid -> {"abstract": str, "affiliations": [unique institution strings, in order]}."""
         out = {}
         for i in range(0, len(pmids), EFETCH_CHUNK):
             chunk = pmids[i:i + EFETCH_CHUNK]
@@ -122,9 +123,18 @@ class PubMed:
                         continue
                     label = node.get("Label")
                     parts.append((label.upper() + ": " + txt) if label else txt)
-                if parts:
-                    out[pid] = "\n\n".join(parts)
+                affs, seen = [], set()
+                for node in art.findall(".//AuthorList/Author/AffiliationInfo/Affiliation"):
+                    txt = _aff(node)
+                    if txt and txt not in seen:   # dedup: list each institution once, no author attached
+                        seen.add(txt)
+                        affs.append(txt)
+                out[pid] = {"abstract": "\n\n".join(parts), "affiliations": affs}
         return out
+
+    def efetch_abstracts(self, pmids):
+        """pmid -> abstract text (only for articles that have one). [kept for callers needing only abstracts]"""
+        return {p: d["abstract"] for p, d in self.efetch_full(pmids).items() if d.get("abstract")}
 
 
 def _clean(s):
@@ -133,6 +143,21 @@ def _clean(s):
     import re
     s = re.sub(r"<[^>]+>", "", s)          # strip light markup esummary may carry
     return re.sub(r"\s+", " ", s).strip()
+
+
+def _aff(node):
+    """Affiliation text, whitespace-normalized, with any trailing contact email(s) dropped.
+
+    PubMed appends the corresponding author's email to the affiliation — sometimes prefixed
+    'Electronic address:', often bare, occasionally several. Strip trailing email tokens in a
+    loop; anchored at end so a legitimate mid-string '@' (e.g. 'Water@Leeds') is never touched.
+    """
+    txt = re.sub(r"\s+", " ", "".join(node.itertext())).strip()
+    prev = None
+    while prev != txt:
+        prev = txt
+        txt = re.sub(r"[\s;,]*(?:Electronic address:\s*)?\S+@\S+\s*$", "", txt, flags=re.I).strip()
+    return txt
 
 
 def _authors(authors):

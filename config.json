@@ -39,6 +39,7 @@
     "docs": "docs",
     "articles": "docs/articles.json",
     "abstracts": "docs/abstracts.json",
+    "affiliations": "docs/affiliations.json",
     "state": "state.json"
   }
 }

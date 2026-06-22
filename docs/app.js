@@ -3,6 +3,7 @@
 
   var ARTICLES_URL = 'articles.json';
   var ABSTRACTS_URL = 'abstracts.json';
+  var AFFILS_URL = 'affiliations.json';
   var LS = {
     state: 'ncbifeed.v1.state', // { pmid: {archived?,important?,stars?,projects?, t} }
     prefs: 'ncbifeed.v1.prefs', // { view, sort }
@@ -30,6 +31,7 @@
   var rendered = 0;
   var searchTerm = '';
   var abstracts = null, abstractsPromise = null;
+  var affils = null, affilsPromise = null;
   var newIds = {};
   var freshData = null;
 
@@ -401,7 +403,7 @@
     paintState(node, a);
 
     main.addEventListener('click', function () { togglePeek(node, '.details-peek', null); });
-    node.querySelector('.authors-btn').addEventListener('click', function (e) { togglePeek(node, '.authors-peek', e.currentTarget); });
+    node.querySelector('.authors-btn').addEventListener('click', function (e) { toggleAuthors(node, a, e.currentTarget); });
     titleBtn.addEventListener('click', function (e) { togglePeek(node, '.title-peek', e.currentTarget); });
     abBtn.addEventListener('click', function () { toggleAbstract(node, a); });
     var noteBox = node.querySelector('.note-text');
@@ -597,6 +599,45 @@
       txt.classList.remove('is-loading');
       txt.textContent = ab || 'No abstract available for this article.';
       txt.dataset.loaded = '1';
+    });
+  }
+
+  function loadAffils() {
+    if (affils) return Promise.resolve(affils);
+    if (affilsPromise) return affilsPromise;
+    affilsPromise = fetch(AFFILS_URL).then(function (r) {
+      if (!r.ok) throw new Error('no affiliations');
+      return r.json();
+    }).then(function (d) { affils = (d && d.affiliations) || {}; return affils; })
+      .catch(function () { affilsPromise = null; return {}; });   // don't poison the session — retry next open
+    return affilsPromise;
+  }
+  // Authors peek: names show instantly (from articles.json); institutions lazy-load from affiliations.json
+  function toggleAuthors(node, a, btn) {
+    var box = node.querySelector('.authors-peek');
+    var willOpen = box.hidden;
+    closePeeks(node);                 // collapse any other open peek first
+    if (!willOpen) return;            // was open -> now closed
+    if (btn) btn.setAttribute('aria-expanded', 'true');
+    box.hidden = false;
+    var wrap = node.querySelector('.affil-text');
+    var label = node.querySelector('.affil-label');
+    if (wrap.dataset.loaded) return;
+    wrap.textContent = 'Loading affiliations…';
+    wrap.classList.add('is-loading');
+    label.hidden = false;
+    loadAffils().then(function (map) {
+      var list = map[a.id] || [];
+      wrap.classList.remove('is-loading');
+      wrap.textContent = '';
+      wrap.dataset.loaded = '1';
+      if (!list.length) { label.hidden = true; return; }   // none on PubMed -> hide the sub-section
+      for (var i = 0; i < list.length; i++) {
+        var p = document.createElement('p');
+        p.className = 'affil-item';
+        p.textContent = list[i];
+        wrap.appendChild(p);
+      }
     });
   }
 

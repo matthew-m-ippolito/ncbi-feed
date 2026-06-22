@@ -1,5 +1,5 @@
 /* Bump VERSION whenever you change index.html / app.css / app.js. */
-var VERSION = 'v25';
+var VERSION = 'v26';
 var SHELL = 'shell-' + VERSION;
 var DATA = 'data-' + VERSION;
 var SHELL_FILES = [
@@ -61,7 +61,7 @@ self.addEventListener('fetch', function (e) {
   if (url.origin !== self.location.origin) return; // let PubMed etc. go to network
 
   // data files: fast + offline-capable, refreshed in background
-  if (/\/(articles|abstracts)\.json$/.test(url.pathname)) {
+  if (/\/(articles|abstracts|affiliations)\.json$/.test(url.pathname)) {
     if (req.cache === 'no-store') return;          // the page's explicit freshness probe
     e.respondWith(staleWhileRevalidate(req));
     return;

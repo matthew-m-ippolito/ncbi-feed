@@ -45,6 +45,15 @@ def save_abstracts(path, mp):
     _write(path, {"schema": 1, "abstracts": mp})
 
 
+def load_affiliations(path):
+    d = _read(path, {})
+    return d.get("affiliations", {}) if isinstance(d, dict) else {}
+
+
+def save_affiliations(path, mp):
+    _write(path, {"schema": 1, "affiliations": mp})
+
+
 def load_state(path):
     return _read(path, {"processed_ids": [], "last_run": None})
 
