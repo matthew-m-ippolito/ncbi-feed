@@ -764,6 +764,7 @@
   // ---------- GitHub triage backup/sync (single user) ----------
   var GH_OWNER = 'matthew-m-ippolito', GH_REPO = 'ncbi-feed', GH_BRANCH = 'triage-state', GH_PATH = 'triage.json';
   var GH_API = 'https://api.github.com/repos/' + GH_OWNER + '/' + GH_REPO;
+  var WF_FILE = 'daily-import.yml';   // the cloud import workflow (triggered by the Import button)
   var sync = load(LS.sync, {});
   var remoteSha = null, syncing = false, pushTimer = null;
 
@@ -881,11 +882,83 @@
     var cap = n ? (n + ' saved ★ article' + (n === 1 ? '' : 's')) : 'No saved articles yet';
     document.querySelector('#menu-export-csv .menu-item-sub').textContent = cap + ' → CSV spreadsheet';
     document.querySelector('#menu-export-zotero .menu-item-sub').textContent = cap + ' → Zotero library (.ris), tags kept';
+    if (!importing) setImportStatus(IMPORT_HINT, '');   // clear any stale "Imported ✓"/error from a prior run
     if (n) loadAbstracts();           // warm the abstract cache so a Zotero export can use the iOS share sheet
     setView('menu');
     settingsModal.hidden = false;
   }
   function closeSettings() { settingsModal.hidden = true; }
+
+  // ---------- on-demand import (triggers the cloud GitHub Actions workflow) ----------
+  var IMPORT_HINT = "Fetch today's new articles now (runs in the cloud, ~1–3 min)";
+  var importing = false;
+  function setImportStatus(msg, kind) {
+    var el = document.querySelector('#menu-import .menu-item-sub');
+    if (el) { el.textContent = msg; el.className = 'menu-item-sub' + (kind ? ' is-' + kind : ''); }
+  }
+  function triggerImport() {
+    if (!syncEnabled()) {
+      setImportStatus('Set up Backup & Sync first — the same GitHub token is used.', 'err');
+      setView('sync');
+      return;
+    }
+    if (importing) return;                 // ignore repeat taps while a run is in flight
+    importing = true;
+    setImportStatus('Starting import…', 'busy');
+    var prevGen = currentGenerated;        // detect the new publish by a change in generated_at
+    var runsUrl = GH_API + '/actions/workflows/' + WF_FILE + '/runs?event=workflow_dispatch&per_page=1';
+    // capture the newest existing dispatch run id so we can identify OUR run by id (no clock math)
+    fetch(runsUrl, { headers: ghHeaders(), cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      .then(function (d) {
+        var prevId = (d && d.workflow_runs && d.workflow_runs[0]) ? d.workflow_runs[0].id : 0;
+        return fetch(GH_API + '/actions/workflows/' + WF_FILE + '/dispatches', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + sync.token, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ref: 'main' })
+        }).then(function (r) {
+          if (r.status === 204) { setImportStatus('Importing new abstracts… (usually 1–3 min)', 'busy'); pollImport(prevId, prevGen, Date.now() + 360000); }
+          else if (r.status === 403) { importing = false; setImportStatus('Your GitHub token needs "Actions: read and write" — add it to the token in GitHub → Developer settings.', 'err'); }
+          else if (r.status === 404) { importing = false; setImportStatus('Import workflow not found yet (still deploying?). Try again in a minute.', 'err'); }
+          else { importing = false; setImportStatus('Couldn’t start import (HTTP ' + r.status + ').', 'err'); }
+        });
+      }).catch(function () { importing = false; setImportStatus('Network error starting import.', 'err'); });
+  }
+  function pollImport(prevId, prevGen, deadline) {
+    if (Date.now() > deadline) { importing = false; setImportStatus('Still running — new articles will appear shortly.', 'busy'); setTimeout(checkForUpdates, 20000); return; }
+    fetch(GH_API + '/actions/workflows/' + WF_FILE + '/runs?event=workflow_dispatch&per_page=1', { headers: ghHeaders(), cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var run = d && d.workflow_runs && d.workflow_runs[0];
+        if (!run || run.id === prevId) { setTimeout(function () { pollImport(prevId, prevGen, deadline); }, 6000); return; }  // our run not registered yet
+        if (run.status !== 'completed') { setImportStatus('Importing… (' + String(run.status).replace('_', ' ') + ')', 'busy'); setTimeout(function () { pollImport(prevId, prevGen, deadline); }, 6000); return; }
+        if (run.conclusion === 'success') { awaitPublish(prevGen, Date.now() + 240000); }
+        else { importing = false; setImportStatus('Import finished: ' + run.conclusion + ' — check the repo’s Actions tab.', 'err'); }
+      }).catch(function () { setTimeout(function () { pollImport(prevId, prevGen, deadline); }, 8000); });
+  }
+  // Actions success only means "pushed" — wait for GitHub Pages to actually republish (generated_at
+  // changes) before loading, so we never report "nothing new" against the still-stale published file.
+  function awaitPublish(prevGen, deadline) {
+    fetch(ARTICLES_URL, { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (d && d.articles && d.generated_at && d.generated_at !== prevGen) {
+        var have = {}; allArticles.forEach(function (a) { have[a.id] = 1; });
+        var n = 0; d.articles.forEach(function (a) { if (!have[String(a.id)]) n++; });
+        currentGenerated = d.generated_at;
+        abstracts = null; abstractsPromise = null; affils = null; affilsPromise = null;  // drop stale lazy caches
+        ingest(d, true);
+        freshData = null; newPill.hidden = true;                                          // clear any stale "N new" pill
+        importing = false;
+        setImportStatus(n > 0 ? ('Imported ✓ — ' + n + ' new article' + (n === 1 ? '' : 's')) : 'Done ✓ — nothing new today.', 'ok');
+      } else if (Date.now() < deadline) {
+        setImportStatus('Publishing… (almost there)', 'busy');
+        setTimeout(function () { awaitPublish(prevGen, deadline); }, 10000);
+      } else { importing = false; setImportStatus('Imported ✓ — reload shortly to see changes.', 'ok'); }
+    }).catch(function () {
+      if (Date.now() < deadline) { setTimeout(function () { awaitPublish(prevGen, deadline); }, 10000); }
+      else { importing = false; setImportStatus('Imported ✓ — reload to see changes.', 'ok'); }
+    });
+  }
+
   function exportJSON() {
     var blob = new Blob([JSON.stringify({ v: 1, exportedAt: Date.now(), items: state }, null, 2)], { type: 'application/json' });
     var url = URL.createObjectURL(blob), el = document.createElement('a');
@@ -908,6 +981,7 @@
     document.getElementById('settings-btn').addEventListener('click', openSettings);
     document.getElementById('set-close').addEventListener('click', closeSettings);
     settingsModal.addEventListener('click', function (e) { if (e.target === settingsModal) closeSettings(); });
+    document.getElementById('menu-import').addEventListener('click', triggerImport);   // keep menu open to show status
     document.getElementById('menu-export-csv').addEventListener('click', function () { closeSettings(); exportCSV(); });
     document.getElementById('menu-export-zotero').addEventListener('click', function () { closeSettings(); exportZotero(); });
     document.getElementById('menu-sync').addEventListener('click', function () { setView('sync'); });

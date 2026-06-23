@@ -38,6 +38,9 @@ def log(*a):
 def headlines_cfg(cfg):
     h = dict(cfg["headlines"])
     h["projects"] = []  # auto-tagging disabled; projects are assigned manually in the app
+    w = os.environ.get("CLAUDE_WORKERS")  # CI throttles concurrent `claude` sessions to avoid rate limits
+    if w and w.isdigit():
+        h["workers"] = max(1, int(w))
     return h
 
 
@@ -139,6 +142,15 @@ def main():
     items = [{"id": pid, "title": meta[pid]["title"], "abstract": abmap.get(pid, "")}
              for pid in usable]
     hmap = headlines.generate(items, headlines_cfg(cfg), log=log)
+    # Abort (non-zero exit) if a large share of summaries fell back to the title (the signature of a
+    # broadly-failed generation, e.g. the LLM rate-limited in CI). This stops a degraded run from
+    # being committed/published — the workflow's commit step only runs if this process succeeds.
+    fb = sum(1 for pid in usable
+             if (hmap.get(pid) or {}).get("details", "") == headlines.clean_title(meta[pid]["title"]))
+    if usable and fb >= 2 and fb / len(usable) > 0.3:
+        log("ABORT: %d/%d summaries fell back to title-only (LLM likely unavailable/rate-limited) — "
+            "not writing or publishing this run." % (fb, len(usable)))
+        sys.exit(1)
     log("adversarially checking %d new summaries ..." % len(items))
     hmap, vstats = verify.verify_and_correct(items, hmap, headlines_cfg(cfg), log=log)
     log("  adversarial result: %s" % vstats)

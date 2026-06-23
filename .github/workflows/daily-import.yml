@@ -1,0 +1,76 @@
+name: Daily import
+
+# Runs the PubMed -> Opus-summary -> faithfulness-check pipeline in the cloud and pushes the
+# updated feed (docs/articles.json, abstracts.json, affiliations.json). Two triggers:
+#   - schedule: every day, so new abstracts are ready in the morning
+#   - workflow_dispatch: the app's Settings -> "Import new abstracts now" button calls this
+#
+# Auth to Claude uses CLAUDE_CODE_OAUTH_TOKEN (from `claude setup-token` on your Mac), which bills
+# against your Claude subscription — NOT a pay-per-use API key. Set it as a repo Actions secret.
+on:
+  schedule:
+    # 09:00 UTC = 05:00 America/New_York during EDT (summer) and 04:00 during EST (winter).
+    # GitHub cron is UTC-only (no DST), so this means "new abstracts ready by ~05:00 ET year-round".
+    - cron: '0 9 * * *'
+  workflow_dispatch: {}
+
+# only one import at a time (a manual run won't collide with the scheduled one)
+concurrency:
+  group: daily-import
+  cancel-in-progress: false
+
+permissions:
+  contents: write          # commit + push the regenerated feed to main (which serves GitHub Pages)
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python deps
+        run: pip install --quiet requests lxml
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Claude Code CLI
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Import new abstracts (PubMed -> summaries -> faithfulness check)
+        env:
+          # subscription auth for `claude -p`; do NOT also set ANTHROPIC_API_KEY (it takes precedence)
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # keep concurrent `claude` sessions low so one OAuth token doesn't trip subscription rate limits;
+          # run.py exits non-zero if too many summaries fall back to title-only, which skips the commit below
+          CLAUDE_WORKERS: '2'
+        run: |
+          if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
+            echo "::error::CLAUDE_CODE_OAUTH_TOKEN secret is not set. Run 'claude setup-token' on your Mac and add it in repo Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          python3 pipeline/run.py --no-deploy
+
+      - name: Commit & push if the feed changed
+        run: |
+          git config user.name "ncbi-feed bot"
+          git config user.email "ncbi-feed@users.noreply.github.com"
+          git add docs/
+          if git diff --cached --quiet; then
+            echo "No new articles — nothing to commit."
+          else
+            git commit -m "Daily import $(date -u +'%Y-%m-%d %H:%M UTC')"
+            # rebase-retry in case main moved (insurance against any concurrent writer)
+            for i in 1 2 3; do
+              git pull --rebase origin main && git push && break || { echo "push retry $i"; sleep 5; }
+            done
+          fi
