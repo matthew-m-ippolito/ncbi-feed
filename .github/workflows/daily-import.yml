@@ -12,7 +12,12 @@ on:
     # 09:00 UTC = 05:00 America/New_York during EDT (summer) and 04:00 during EST (winter).
     # GitHub cron is UTC-only (no DST), so this means "new abstracts ready by ~05:00 ET year-round".
     - cron: '0 9 * * *'
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 'Days of PubMed history to pull (blank = the usual 3; raise it to backfill after an outage)'
+        required: false
+        default: ''
 
 # only one import at a time (a manual run won't collide with the scheduled one)
 concurrency:
@@ -75,12 +80,18 @@ jobs:
           # keep concurrent `claude` sessions low so one OAuth token doesn't trip subscription rate limits;
           # run.py exits non-zero if too many summaries fall back to title-only, which skips the commit below
           CLAUDE_WORKERS: '2'
+          DAYS: ${{ inputs.days }}
         run: |
           if [ -z "$CLAUDE_CODE_OAUTH_TOKEN" ]; then
             echo "::error::CLAUDE_CODE_OAUTH_TOKEN secret is not set. Run 'claude setup-token' on your Mac and add it in repo Settings -> Secrets and variables -> Actions."
             exit 1
           fi
-          python3 pipeline/run.py --no-deploy
+          set --
+          if [ -n "$DAYS" ]; then
+            case "$DAYS" in ''|*[!0-9]*) echo "::error::days must be a whole number"; exit 1;; esac
+            set -- --days "$DAYS"
+          fi
+          python3 pipeline/run.py --no-deploy "$@"
 
       - name: Commit & push if the feed changed
         run: |
