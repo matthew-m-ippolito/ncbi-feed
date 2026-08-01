@@ -117,6 +117,10 @@ def _call_claude(prompt, model, timeout):
         ["claude", "-p", prompt, "--model", model],
         stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=timeout,
     )
+    if p.returncode != 0 or not p.stdout.strip():
+        # an empty stdout is indistinguishable from a refusal downstream, so name the cause here
+        err = re.sub(r"\s+", " ", p.stderr or "").strip()[:300]
+        print("    claude failed: exit=%s stderr=%s" % (p.returncode, err or "(empty)"), flush=True)
     return p.stdout
 
 

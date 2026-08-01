@@ -46,6 +46,28 @@ jobs:
       - name: Install Claude Code CLI
         run: npm install -g @anthropic-ai/claude-code
 
+      # One cheap `claude` call before the pipeline runs. Without this a bad token looks
+      # identical to a bad feed: every summary silently falls back to the title and run.py
+      # aborts ~16s later with no reason recorded anywhere in the log.
+      - name: Verify Claude CLI auth
+        env:
+          CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        run: |
+          echo "claude-code version: $(claude --version 2>&1 || true)"
+          set +e
+          OUT=$(claude -p 'Reply with exactly: OK' --model claude-opus-4-8 2>/tmp/claude_err.txt)
+          RC=$?
+          set -e
+          echo "exit code: $RC"
+          echo "stdout: [$OUT]"
+          echo "--- stderr ---"
+          sed -e 's/[A-Za-z0-9_-]\{32,\}/<redacted>/g' /tmp/claude_err.txt
+          echo "--------------"
+          if [ $RC -ne 0 ] || [ -z "$OUT" ]; then
+            echo "::error::Claude CLI could not complete a trivial request (exit $RC). The stderr above is the real failure — most likely an expired CLAUDE_CODE_OAUTH_TOKEN (regenerate with 'claude setup-token')."
+            exit 1
+          fi
+
       - name: Import new abstracts (PubMed -> summaries -> faithfulness check)
         env:
           # subscription auth for `claude -p`; do NOT also set ANTHROPIC_API_KEY (it takes precedence)
